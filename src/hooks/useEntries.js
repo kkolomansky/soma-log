@@ -18,12 +18,19 @@ function fromRow(row) {
   };
 }
 
-export function useEntries() {
+export function useEntries(userId) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const loadEntries = useCallback(async () => {
+    // Bez zalogowanego użytkownika nie odpytujemy bazy (RLS i tak nic nie zwróci).
+    if (!userId) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     const { data, error } = await supabase
       .from(ENTRIES_TABLE)
@@ -37,7 +44,7 @@ export function useEntries() {
       setEntries(data.map(fromRow));
     }
     setLoading(false);
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     loadEntries();
