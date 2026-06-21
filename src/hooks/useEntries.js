@@ -1,11 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, ENTRIES_TABLE } from '../lib/supabase';
 
-/**
- * Wpisy aplikacji przechowywane są w bazie Supabase (tabela `soma_entries`),
- * a nie lokalnie w przeglądarce. Rekord z bazy mapujemy na kształt używany
- * przez UI (m.in. created_at -> timestamp).
- */
 function fromRow(row) {
   return {
     id: row.id,
@@ -24,7 +19,6 @@ export function useEntries(userId) {
   const [error, setError] = useState(null);
 
   const loadEntries = useCallback(async () => {
-    // Bez zalogowanego użytkownika nie odpytujemy bazy (RLS i tak nic nie zwróci).
     if (!userId) {
       setEntries([]);
       setLoading(false);
@@ -50,6 +44,16 @@ export function useEntries(userId) {
     loadEntries();
   }, [loadEntries]);
 
+  // O(1) lookup: date string ('YYYY-MM-DD' in local time) → most recent entry for that day
+  const entriesByDate = useMemo(() => {
+    const map = new Map();
+    for (const e of entries) {
+      const dateKey = new Date(e.timestamp).toLocaleDateString('en-CA');
+      if (!map.has(dateKey)) map.set(dateKey, e); // entries sorted newest first; keep first
+    }
+    return map;
+  }, [entries]);
+
   const addEntry = useCallback(async (entry) => {
     const { mood, recovery, sleep, doms, note } = entry;
     const { data, error } = await supabase
@@ -69,7 +73,6 @@ export function useEntries(userId) {
   }, []);
 
   const deleteEntry = useCallback(async (id) => {
-    // Optymistyczne usunięcie z UI, z przywróceniem w razie błędu
     const prev = entries;
     setEntries(prev.filter(e => e.id !== id));
 
@@ -84,5 +87,5 @@ export function useEntries(userId) {
     }
   }, [entries]);
 
-  return { entries, addEntry, deleteEntry, loading, error, reload: loadEntries };
+  return { entries, entriesByDate, addEntry, deleteEntry, loading, error, reload: loadEntries };
 }

@@ -1,21 +1,30 @@
 import { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useEntries } from './hooks/useEntries';
-import BottomNav from './components/BottomNav';
-import AddEntry from './screens/AddEntry';
-import LogList from './screens/LogList';
-import Trends from './screens/Trends';
+import { toDateString, buildLast30Days } from './utils/dateUtils';
+import AppLayout from './layouts/AppLayout';
+import Header from './components/Header';
+import DayStrip from './components/DayStrip';
+import DayView from './components/DayView';
+import InputBar from './components/InputBar';
+import AddEntryModal from './components/AddEntryModal';
+import TrendsOverlay from './components/TrendsOverlay';
 import Auth from './screens/Auth';
 
-export default function App() {
-  const [screen, setScreen] = useState('add');
-  const { session, loading, signIn, signUp, signOut } = useAuth();
-  const userId = session?.user?.id ?? null;
-  const { entries, addEntry, deleteEntry } = useEntries(userId);
+const DAYS = buildLast30Days();
 
-  if (loading) {
+export default function App() {
+  const [selectedDate, setSelectedDate] = useState(() => toDateString(new Date()));
+  const [showAddModal, setShowAddModal]  = useState(false);
+  const [showTrends,   setShowTrends]    = useState(false);
+
+  const { session, loading: authLoading, signIn, signUp, signOut } = useAuth();
+  const userId = session?.user?.id ?? null;
+  const { entries, entriesByDate, addEntry, deleteEntry } = useEntries(userId);
+
+  if (authLoading) {
     return (
-      <div className="bg-[#111111] min-h-screen max-w-md mx-auto flex items-center justify-center">
+      <div className="bg-[#111111] min-h-screen flex items-center justify-center">
         <p className="text-gray-600 text-sm">Ładowanie…</p>
       </div>
     );
@@ -23,38 +32,70 @@ export default function App() {
 
   if (!session) {
     return (
-      <div className="relative bg-[#111111] min-h-screen max-w-md mx-auto">
+      <div className="bg-[#111111] min-h-screen max-w-md mx-auto">
         <Auth onSignIn={signIn} onSignUp={signUp} />
       </div>
     );
   }
 
+  const selectedEntry = entriesByDate.get(selectedDate) ?? null;
+
+  const handleSave = async (data) => {
+    await addEntry(data);
+    setShowAddModal(false);
+    setSelectedDate(toDateString(new Date()));
+  };
+
   return (
-    <div className="relative bg-[#111111] min-h-screen max-w-md mx-auto">
-
-      {/* Global app header */}
-      <header className="px-4 pt-8 pb-3 border-b border-[#1e1e1e] flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">SomaLog</h1>
-          <p className="text-[11px] text-gray-600 mt-0.5 leading-snug">
-            Aplikacja do śledzenia subiektywnego samopoczucia i regeneracji potreningowej
-          </p>
-        </div>
-        <button
-          onClick={signOut}
-          className="shrink-0 text-gray-500 hover:text-gray-300 transition-colors text-xs px-2 py-1 rounded-lg hover:bg-[#2a2a2a]"
-        >
-          wyloguj
-        </button>
-      </header>
-
-      <div className="pb-24 overflow-y-auto">
-        {screen === 'add'    && <AddEntry onSave={addEntry} onNavigate={setScreen} />}
-        {screen === 'log'    && <LogList entries={entries} onDelete={deleteEntry} />}
-        {screen === 'trends' && <Trends entries={entries} />}
-      </div>
-
-      <BottomNav current={screen} onChange={setScreen} />
-    </div>
+    <AppLayout
+      header={
+        <Header
+          onTrendsClick={() => setShowTrends(true)}
+          onSignOut={signOut}
+        />
+      }
+      dayStrip={
+        <DayStrip
+          days={DAYS}
+          selectedDate={selectedDate}
+          entriesByDate={entriesByDate}
+          onSelect={setSelectedDate}
+        />
+      }
+      dayStripVertical={
+        <DayStrip
+          days={DAYS}
+          selectedDate={selectedDate}
+          entriesByDate={entriesByDate}
+          onSelect={setSelectedDate}
+          vertical
+        />
+      }
+      dayView={
+        <DayView
+          entry={selectedEntry}
+          selectedDate={selectedDate}
+          onAddClick={() => setShowAddModal(true)}
+          onDelete={deleteEntry}
+        />
+      }
+      inputBar={
+        <InputBar onMicClick={() => setShowAddModal(true)} />
+      }
+      modals={
+        <>
+          <AddEntryModal
+            open={showAddModal}
+            onClose={() => setShowAddModal(false)}
+            onSave={handleSave}
+          />
+          <TrendsOverlay
+            open={showTrends}
+            onClose={() => setShowTrends(false)}
+            entries={entries}
+          />
+        </>
+      }
+    />
   );
 }

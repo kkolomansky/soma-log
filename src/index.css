@@ -39,3 +39,11 @@ input[type='range']::-moz-range-thumb {
   cursor: pointer;
   border: 2px solid #111;
 }
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

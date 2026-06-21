@@ -20,8 +20,7 @@ export default function Trends({ entries }) {
   if (entries.length === 0) {
     return (
       <div className="px-4 pt-6 flex flex-col items-center">
-        <h2 className="text-xl font-bold text-white tracking-tight w-full mb-16">Historia</h2>
-        <div className="text-center">
+        <div className="text-center mt-16">
           <p className="text-5xl mb-4">📈</p>
           <p className="text-gray-500 text-sm">Brak wpisów do wyświetlenia.</p>
           <p className="text-gray-600 text-xs mt-1">Dodaj wpisy, by śledzić trendy.</p>
@@ -31,9 +30,8 @@ export default function Trends({ entries }) {
   }
 
   return (
-    <div className="px-4 pt-6 pb-4">
+    <div className="px-4 pt-4 pb-4">
       <div className="flex items-baseline justify-between mb-4">
-        <h2 className="text-xl font-bold text-white tracking-tight">Historia</h2>
         <span className="text-gray-600 text-sm">{filtered.length} wpisów</span>
       </div>
 
