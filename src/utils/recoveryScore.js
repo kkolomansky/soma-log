@@ -1,16 +1,17 @@
+// Wszystkie parametry w skali 0–100. DOMS odwrócony (niżej = lepiej → 100 - doms).
 export function calcScore(entry) {
-  const doms = 11 - entry.doms;
-  return Math.round(((entry.mood + entry.recovery + entry.sleep + doms) / 40) * 100);
+  return Math.round((entry.mood + entry.recovery + entry.sleep + (100 - entry.doms)) / 4);
 }
 
+// 5 poziomów regeneracji co 20 (czerwony → zielony).
 export function scoreLabel(score) {
-  if (score >= 75) return { text: 'Dobra regeneracja',       color: '#22c55e' };
-  if (score >= 50) return { text: 'Umiarkowana regeneracja', color: '#eab308' };
-  return               { text: 'Słaba regeneracja',          color: '#ef4444' };
+  if (score >= 80) return { text: 'Bardzo dobra regeneracja', color: '#22c55e' };
+  if (score >= 60) return { text: 'Dobra regeneracja',        color: '#84cc16' };
+  if (score >= 40) return { text: 'Średnia regeneracja',      color: '#eab308' };
+  if (score >= 20) return { text: 'Słaba regeneracja',        color: '#f97316' };
+  return               { text: 'Bardzo słaba regeneracja', color: '#ef4444' };
 }
 
-export function scorePillClasses(score) {
-  if (score >= 75) return 'ring-green-500 bg-green-500/10';
-  if (score >= 50) return 'ring-yellow-500 bg-yellow-500/10';
-  return 'ring-red-500 bg-red-500/10';
+export function scoreColor(score) {
+  return scoreLabel(score).color;
 }

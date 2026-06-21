@@ -29,3 +29,8 @@ export function formatFullDate(dateStr) {
     weekday: 'long', day: 'numeric', month: 'long',
   });
 }
+
+export function formatMonthYear(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+}

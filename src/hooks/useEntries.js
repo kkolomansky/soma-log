@@ -4,7 +4,10 @@ import { supabase, ENTRIES_TABLE } from '../lib/supabase';
 function fromRow(row) {
   return {
     id: row.id,
-    timestamp: row.created_at,
+    timestamp: row.created_at, // używane przez TrendChart
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    entryDate: row.entry_date, // 'YYYY-MM-DD' (data dnia, niezależna od strefy)
     mood: row.mood,
     recovery: row.recovery,
     sleep: row.sleep,
@@ -44,21 +47,26 @@ export function useEntries(userId) {
     loadEntries();
   }, [loadEntries]);
 
-  // O(1) lookup: date string ('YYYY-MM-DD' in local time) → most recent entry for that day
+  // O(1) lookup: entry_date ('YYYY-MM-DD') → wpis dnia. Jeden wpis na dzień (unique w bazie).
   const entriesByDate = useMemo(() => {
     const map = new Map();
     for (const e of entries) {
-      const dateKey = new Date(e.timestamp).toLocaleDateString('en-CA');
-      if (!map.has(dateKey)) map.set(dateKey, e); // entries sorted newest first; keep first
+      if (!map.has(e.entryDate)) map.set(e.entryDate, e);
     }
     return map;
   }, [entries]);
 
-  const addEntry = useCallback(async (entry) => {
+  // Upsert po (user_id, entry_date): zapis danego dnia aktualizuje istniejący wpis zamiast
+  // tworzyć duplikat. updated_at jest aktualizowany triggerem w bazie.
+  const saveEntry = useCallback(async (dateStr, entry) => {
+    if (!userId) return null;
     const { mood, recovery, sleep, doms, note } = entry;
     const { data, error } = await supabase
       .from(ENTRIES_TABLE)
-      .insert({ mood, recovery, sleep, doms, note: note ?? '' })
+      .upsert(
+        { user_id: userId, entry_date: dateStr, mood, recovery, sleep, doms, note: note ?? '' },
+        { onConflict: 'user_id,entry_date' }
+      )
       .select()
       .single();
 
@@ -67,10 +75,13 @@ export function useEntries(userId) {
       return null;
     }
 
-    const newEntry = fromRow(data);
-    setEntries(prev => [newEntry, ...prev]);
-    return newEntry;
-  }, []);
+    const saved = fromRow(data);
+    setEntries(prev => {
+      const without = prev.filter(e => e.entryDate !== saved.entryDate);
+      return [saved, ...without].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    });
+    return saved;
+  }, [userId]);
 
   const deleteEntry = useCallback(async (id) => {
     const prev = entries;
@@ -87,5 +98,5 @@ export function useEntries(userId) {
     }
   }, [entries]);
 
-  return { entries, entriesByDate, addEntry, deleteEntry, loading, error, reload: loadEntries };
+  return { entries, entriesByDate, saveEntry, deleteEntry, loading, error, reload: loadEntries };
 }

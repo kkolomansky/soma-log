@@ -10,19 +10,23 @@ function MicIcon() {
   );
 }
 
-export default function InputBar({ onMicClick }) {
+export default function InputBar() {
+  // Pasek transkrypcji — placeholder. Logika rozpoznawania mowy w kolejnym kroku.
   return (
     <div className="shrink-0 bg-[#111111] border-t border-[#1e1e1e] px-4 py-3">
-      <div className="flex items-center gap-3 bg-[#1c1c1e] rounded-2xl px-4 py-2.5">
+      <div className="flex items-center gap-3 bg-[#1c1c1e] rounded-2xl px-4 py-2.5 opacity-60">
         <input
           type="text"
-          placeholder="Napisz lub nagraj..."
-          className="flex-1 bg-transparent text-white placeholder-gray-600 text-sm outline-none"
+          placeholder="Transkrypcja głosowa — wkrótce"
+          className="flex-1 bg-transparent text-white placeholder-gray-600 text-sm outline-none cursor-not-allowed"
           readOnly
         />
         <button
-          onClick={onMicClick}
-          className="w-8 h-8 rounded-full bg-[#2a2a2a] flex items-center justify-center hover:bg-[#333] active:scale-95 transition-all shrink-0"
+          type="button"
+          disabled
+          title="Transkrypcja głosowa — wkrótce"
+          aria-label="Transkrypcja — wkrótce"
+          className="w-8 h-8 rounded-full bg-[#2a2a2a] flex items-center justify-center shrink-0 cursor-not-allowed"
         >
           <MicIcon />
         </button>

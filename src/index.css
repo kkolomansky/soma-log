@@ -12,32 +12,48 @@ body {
   overscroll-behavior: none;
 }
 
+/* Suwak dopasowany do ciemnego UI. Wypełnienie ustawia <Slider> przez inline
+   background (gradient), więc tracki są przezroczyste i pokazują to tło. */
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 999px;
   background: #2a2a2a;
   outline: none;
   cursor: pointer;
 }
 
+input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+input[type='range']::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 13px;
+  height: 13px;
+  margin-top: -3.5px;
   border-radius: 50%;
+  background: var(--thumb, #a1a1aa);
+  border: 3px solid #111111;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
   cursor: pointer;
-  border: 2px solid #111;
 }
-
 input[type='range']::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
+  background: var(--thumb, #a1a1aa);
+  border: 3px solid #111111;
   cursor: pointer;
-  border: 2px solid #111;
 }
 
 .scrollbar-hide {
@@ -46,4 +62,27 @@ input[type='range']::-moz-range-thumb {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Subtelny, ciemny scrollbar dopasowany do UI (poza elementami .scrollbar-hide) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
+  background-clip: padding-box;
 }
