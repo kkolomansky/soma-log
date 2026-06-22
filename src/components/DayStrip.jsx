@@ -115,7 +115,7 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }
           style={{ scrollSnapType: 'x mandatory', paddingLeft: sidePad, paddingRight: sidePad }}
         >
           {days.map(dateStr => {
-            const { day } = formatPill(dateStr);
+            const { day, weekday } = formatPill(dateStr);
             const entry = entriesByDate.get(dateStr);
             const isCenter = dateStr === centerDate;
             const isToday = dateStr === today;
@@ -132,6 +132,7 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }
                   ${isToday ? 'ring-2 ring-white/40 ring-offset-2 ring-offset-bg' : ''}
                   ${isCenter ? 'bg-white/10' : 'bg-surface'}`}
               >
+                <span className="text-[9px] font-medium leading-none text-txt-3 mb-0.5">{weekday}</span>
                 <span className={`text-lg font-display font-bold leading-none ${isCenter ? 'text-txt' : 'text-txt-2'}`}>{day}</span>
                 {sc != null ? (
                   <span className="text-[11px] font-mono font-semibold leading-none mt-1" style={{ color: col }}>{sc}%</span>
