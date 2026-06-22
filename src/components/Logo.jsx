@@ -1,9 +1,8 @@
-// Znak marki Soma.Log: „S" w pierścieniu-zegarze (gauge) z zielonym łukiem regeneracji.
-// viewBox ciasny (8..56), żeby pierścień wypełniał pole bez martwego marginesu.
+// Znak marki Soma.Log: pełny zielony pierścień z białą linią pulsu (EKG) w środku.
 export function LogoMark({ size = 36, className = '', style }) {
   return (
     <svg
-      viewBox="8 8 48 48"
+      viewBox="0 0 64 64"
       width={size}
       height={size}
       className={className}
@@ -11,14 +10,15 @@ export function LogoMark({ size = 36, className = '', style }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <circle cx="32" cy="32" r="20" stroke="#1C2320" strokeWidth="5" />
-      <path d="M32 12 a20 20 0 0 1 14.14 34.14" stroke="#22C55E" strokeWidth="5" strokeLinecap="round" />
-      <path
-        d="M38 25.5 C38 22.5 35.3 21 32 21 C28.7 21 26 22.5 26 25 C26 31 39 29 39 35.5 C39 38.5 36 40 32 40 C28.5 40 25.5 38.7 25 36"
+      {/* Pierścień */}
+      <circle cx="32" cy="32" r="25" stroke="#22C55E" strokeWidth="4" />
+      {/* Puls — pozioma linia bazowa z jednym wyraźnym skokiem */}
+      <polyline
+        points="13,32 22,32 26,22 32,43 38,24 42,32 51,32"
         stroke="#F4F4F5"
-        strokeWidth="3.4"
+        strokeWidth="3"
         strokeLinecap="round"
-        fill="none"
+        strokeLinejoin="round"
       />
     </svg>
   );
