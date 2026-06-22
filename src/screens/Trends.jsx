@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import TrendChart from '../components/TrendChart';
 import { TrendsIcon } from '../components/icons';
+import { buildTimeAxis, dateStrToMs } from '../utils/trendAxis';
 
 const RANGES = [
   { label: '7 dni',    days: 7 },
@@ -11,12 +12,13 @@ const RANGES = [
 export default function Trends({ entries }) {
   const [rangeIdx, setRangeIdx] = useState(2);
 
-  const filtered = RANGES[rangeIdx].days
-    ? entries.filter(e => {
-        const cutoff = Date.now() - RANGES[rangeIdx].days * 86_400_000;
-        return new Date(e.timestamp).getTime() >= cutoff;
-      })
-    : entries;
+  const days = RANGES[rangeIdx].days;
+  const axis = buildTimeAxis(days, entries);
+  // Punkty w obrębie domeny osi (po realnej dacie dnia, nie created_at).
+  const filtered = entries.filter(e => {
+    const ms = dateStrToMs(e.entryDate);
+    return ms >= axis.startMs - 43_200_000 && ms <= axis.endMs + 43_200_000;
+  });
 
   if (entries.length === 0) {
     return (
@@ -56,7 +58,7 @@ export default function Trends({ entries }) {
           Potrzeba co najmniej 2 wpisów w wybranym zakresie,{'\n'}by pokazać wykres.
         </p>
       ) : (
-        <TrendChart entries={filtered} />
+        <TrendChart entries={filtered} startMs={axis.startMs} endMs={axis.endMs} ticks={axis.ticks} />
       )}
     </div>
   );

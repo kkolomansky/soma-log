@@ -1,4 +1,7 @@
-const MONTHS_PL = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
+export const MONTHS_PL = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
+
+// Skróty dni tygodnia wg getDay(): 0 = niedziela … 6 = sobota.
+const WEEKDAYS_PL = ['nd','pn','wt','śr','czw','pt','sb'];
 
 export function toDateString(date) {
   // Returns 'YYYY-MM-DD' in LOCAL time (avoids UTC mismatch)
@@ -20,6 +23,7 @@ export function formatPill(dateStr) {
   return {
     day: d.getDate(),
     month: MONTHS_PL[d.getMonth()],
+    weekday: WEEKDAYS_PL[d.getDay()],
   };
 }
 

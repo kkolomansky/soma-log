@@ -205,7 +205,7 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
       <SectionTabs tab={tab} onChange={setTab}>
         {tab === 'wskazniki' ? (
           <>
-            <div className="flex items-start justify-end gap-1 mb-1">
+            <div className="flex items-center justify-end gap-1 mb-1">
               <button
                 onClick={() => onAddClick()}
                 aria-label="Edytuj check-in"
@@ -224,32 +224,30 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
               )}
             </div>
 
-            <div className="flex items-center gap-5">
-              {/* Duży zegar ogólnej regeneracji */}
-              <div className="shrink-0 flex flex-col items-center gap-2">
-                <CircularGauge value={score} max={100} color={label.color} size={120} strokeWidth={10} />
-                <p className="text-sm font-display font-bold text-center max-w-[120px] leading-tight" style={{ color: label.color }}>
-                  {label.text}
-                </p>
-              </div>
+            {/* Duży zegar ogólnej regeneracji — na górze, wyśrodkowany */}
+            <div className="flex flex-col items-center gap-2 mb-6">
+              <CircularGauge value={score} max={100} color={label.color} size={170} strokeWidth={12} />
+              <p className="text-base font-display font-bold text-center leading-tight" style={{ color: label.color }}>
+                {label.text}
+              </p>
+            </div>
 
-              {/* Lista mniejszych zegarów — parametry od góry do dołu (klik → edycja) */}
-              <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                {METRICS.map(m => (
-                  <button
-                    key={m.key}
-                    onClick={() => onAddClick(m.key)}
-                    aria-label={`Edytuj: ${m.label}`}
-                    className="flex items-center gap-3 rounded-xl p-1.5 -mx-1.5 hover:bg-elevated transition-colors text-left"
-                  >
-                    <CircularGauge value={entry[m.key]} max={100} color={m.color} size={44} strokeWidth={4} />
-                    <span className="flex items-center gap-1.5 min-w-0">
-                      <span style={{ color: m.color }}><m.Icon size={16} /></span>
-                      <span className="text-txt-2 text-sm font-medium leading-tight truncate">{m.label}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
+            {/* Parametry — stała siatka 3×2, równomiernie rozłożone (klik → edycja) */}
+            <div className="grid grid-cols-3 gap-3">
+              {METRICS.map(m => (
+                <button
+                  key={m.key}
+                  onClick={() => onAddClick(m.key)}
+                  aria-label={`Edytuj: ${m.label}`}
+                  className="flex flex-col items-center gap-1.5 rounded-xl py-2 hover:bg-elevated transition-colors"
+                >
+                  <CircularGauge value={entry[m.key]} max={100} color={m.color} size={64} strokeWidth={6} />
+                  <span className="flex items-center gap-1 min-w-0">
+                    <span style={{ color: m.color }}><m.Icon size={14} /></span>
+                    <span className="text-txt-2 text-xs font-medium leading-tight truncate">{m.label}</span>
+                  </span>
+                </button>
+              ))}
             </div>
           </>
         ) : (
