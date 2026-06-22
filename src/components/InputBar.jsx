@@ -13,12 +13,12 @@ function MicIcon() {
 export default function InputBar() {
   // Pasek transkrypcji — placeholder. Logika rozpoznawania mowy w kolejnym kroku.
   return (
-    <div className="shrink-0 bg-[#111111] border-t border-[#1e1e1e] px-4 py-3">
-      <div className="flex items-center gap-3 bg-[#1c1c1e] rounded-2xl px-4 py-2.5 opacity-60">
+    <div className="shrink-0 bg-bg border-t border-divider px-4 py-3">
+      <div className="flex items-center gap-3 bg-surface border border-border rounded-2xl px-4 py-2.5 opacity-60">
         <input
           type="text"
           placeholder="Transkrypcja głosowa — wkrótce"
-          className="flex-1 bg-transparent text-white placeholder-gray-600 text-sm outline-none cursor-not-allowed"
+          className="flex-1 bg-transparent text-txt placeholder-txt-3 text-sm outline-none cursor-not-allowed"
           readOnly
         />
         <button
@@ -26,7 +26,7 @@ export default function InputBar() {
           disabled
           title="Transkrypcja głosowa — wkrótce"
           aria-label="Transkrypcja — wkrótce"
-          className="w-8 h-8 rounded-full bg-[#2a2a2a] flex items-center justify-center shrink-0 cursor-not-allowed"
+          className="w-8 h-8 rounded-full bg-elevated flex items-center justify-center shrink-0 cursor-not-allowed"
         >
           <MicIcon />
         </button>

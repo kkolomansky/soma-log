@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import TrendChart from '../components/TrendChart';
+import { TrendsIcon } from '../components/icons';
 
 const RANGES = [
   { label: '7 dni',    days: 7 },
@@ -19,50 +20,44 @@ export default function Trends({ entries }) {
 
   if (entries.length === 0) {
     return (
-      <div className="px-4 pt-6 flex flex-col items-center">
-        <div className="text-center mt-16">
-          <p className="text-5xl mb-4">📈</p>
-          <p className="text-gray-500 text-sm">Brak wpisów do wyświetlenia.</p>
-          <p className="text-gray-600 text-xs mt-1">Dodaj wpisy, by śledzić trendy.</p>
-        </div>
+      <div className="flex flex-col items-center text-center py-10">
+        <span className="text-txt-3 mb-3"><TrendsIcon size={40} /></span>
+        <p className="text-txt-2 text-sm">Brak wpisów do wyświetlenia.</p>
+        <p className="text-txt-3 text-xs mt-1">Dodaj wpisy, by śledzić trendy.</p>
       </div>
     );
   }
 
   return (
-    <div className="px-4 pt-4 pb-4">
-      <div className="flex items-baseline justify-between mb-4">
-        <span className="text-gray-600 text-sm">{filtered.length} wpisów</span>
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-recovery"><TrendsIcon size={16} /></span>
+        <p className="text-txt-2 text-xs font-display font-semibold uppercase tracking-wide">Trendy w czasie</p>
+        <span className="text-txt-3 text-xs font-mono ml-auto">{filtered.length} wpisów</span>
       </div>
 
-      <div className="bg-[#1c1c1e] rounded-2xl p-4">
-        <p className="text-gray-400 text-xs font-semibold mb-3">📊 TRENDY W CZASIE</p>
-
-        {/* Przełącznik zakresu */}
-        <div className="flex gap-2 mb-4">
-          {RANGES.map((r, i) => (
-            <button
-              key={r.label}
-              onClick={() => setRangeIdx(i)}
-              className="flex-1 py-1.5 rounded-xl text-xs font-medium transition-all"
-              style={{
-                backgroundColor: rangeIdx === i ? '#ffffff' : '#2a2a2a',
-                color:           rangeIdx === i ? '#000000' : '#6b7280',
-              }}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-
-        {filtered.length < 2 ? (
-          <p className="text-gray-600 text-xs text-center py-8">
-            Potrzeba co najmniej 2 wpisów w wybranym zakresie,{'\n'}by pokazać wykres.
-          </p>
-        ) : (
-          <TrendChart entries={filtered} />
-        )}
+      {/* Przełącznik zakresu */}
+      <div className="flex gap-2 mb-4">
+        {RANGES.map((r, i) => (
+          <button
+            key={r.label}
+            onClick={() => setRangeIdx(i)}
+            className={`flex-1 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+              rangeIdx === i ? 'bg-recovery text-bg' : 'bg-elevated text-txt-3 hover:text-txt-2'
+            }`}
+          >
+            {r.label}
+          </button>
+        ))}
       </div>
+
+      {filtered.length < 2 ? (
+        <p className="text-txt-3 text-xs text-center py-8">
+          Potrzeba co najmniej 2 wpisów w wybranym zakresie,{'\n'}by pokazać wykres.
+        </p>
+      ) : (
+        <TrendChart entries={filtered} />
+      )}
     </div>
   );
 }

@@ -8,10 +8,12 @@ function fromRow(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     entryDate: row.entry_date, // 'YYYY-MM-DD' (data dnia, niezależna od strefy)
-    mood: row.mood,
-    recovery: row.recovery,
     sleep: row.sleep,
+    energy: row.energy,
+    motivation: row.motivation,
+    fatigue: row.fatigue,
     doms: row.doms,
+    stress: row.stress,
     note: row.note ?? '',
   };
 }
@@ -60,11 +62,11 @@ export function useEntries(userId) {
   // tworzyć duplikat. updated_at jest aktualizowany triggerem w bazie.
   const saveEntry = useCallback(async (dateStr, entry) => {
     if (!userId) return null;
-    const { mood, recovery, sleep, doms, note } = entry;
+    const { sleep, energy, motivation, fatigue, doms, stress, note } = entry;
     const { data, error } = await supabase
       .from(ENTRIES_TABLE)
       .upsert(
-        { user_id: userId, entry_date: dateStr, mood, recovery, sleep, doms, note: note ?? '' },
+        { user_id: userId, entry_date: dateStr, sleep, energy, motivation, fatigue, doms, stress, note: note ?? '' },
         { onConflict: 'user_id,entry_date' }
       )
       .select()

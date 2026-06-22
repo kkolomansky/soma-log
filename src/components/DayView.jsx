@@ -1,14 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import CircularGauge from './CircularGauge';
+import Trends from '../screens/Trends';
 import { calcScore, scoreLabel } from '../utils/recoveryScore';
-import { formatFullDate, toDateString } from '../utils/dateUtils';
-
-const METRICS = [
-  { key: 'mood',     label: 'Mood',     icon: '😊', color: '#22c55e' },
-  { key: 'recovery', label: 'Recovery', icon: '⚡', color: '#eab308' },
-  { key: 'sleep',    label: 'Sleep',    icon: '🌙', color: '#818cf8' },
-  { key: 'doms',     label: 'DOMS',     icon: '🔥', color: '#f97316' },
-];
+import { METRICS } from '../utils/metrics';
+import { GaugeIcon, TrendsIcon } from './icons';
 
 function CloseIcon({ size = 16 }) {
   return (
@@ -42,20 +37,7 @@ function MicIcon({ size = 18 }) {
   );
 }
 
-// Krótki, jednolinijkowy opis dnia na podstawie snu i DOMS (najbardziej aktualne sygnały).
-function dayDescription(entry) {
-  const hi = (v) => (v >= 67 ? 'dobry' : v >= 34 ? 'umiarkowany' : 'słaby');
-  const domsQ = entry.doms <= 33 ? 'niski' : entry.doms <= 66 ? 'umiarkowany' : 'wysoki';
-  return `Sen ${hi(entry.sleep)}, DOMS ${domsQ}`;
-}
-
-function formatTime(ts) {
-  if (!ts) return null;
-  return new Date(ts).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
-}
-
 // Edytowalna notatka dnia. Pusta → mikrofon na środku; wypełniona → mikrofon po prawej.
-// Mikrofon to placeholder transkrypcji (logika później), nie blokuje pisania (pointer-events-none).
 function NoteCard({ note, onSave }) {
   const [draft, setDraft] = useState(note ?? '');
   useEffect(() => { setDraft(note ?? ''); }, [note]);
@@ -66,19 +48,19 @@ function NoteCard({ note, onSave }) {
   };
 
   return (
-    <div className="bg-[#1c1c1e] rounded-2xl p-4">
-      <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-2">Notatka</p>
+    <div className="bg-surface border border-border rounded-2xl p-4">
+      <p className="text-txt-3 text-xs font-medium uppercase tracking-wide mb-2">Notatka</p>
       <div className="relative">
         <textarea
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onBlur={handleBlur}
           rows={hasText ? 3 : 2}
-          className={`w-full bg-transparent text-gray-300 placeholder-gray-700 text-sm resize-none outline-none leading-relaxed ${hasText ? 'pr-9' : ''}`}
+          className={`w-full bg-transparent text-txt-2 placeholder-txt-3 text-sm resize-none outline-none leading-relaxed ${hasText ? 'pr-9' : ''}`}
         />
         <div
           title="Transkrypcja głosowa — wkrótce"
-          className={`pointer-events-none absolute text-gray-600 ${
+          className={`pointer-events-none absolute text-txt-3 ${
             hasText ? 'right-0 top-0' : 'inset-0 flex items-center justify-center'
           }`}
         >
@@ -89,31 +71,123 @@ function NoteCard({ note, onSave }) {
   );
 }
 
-export default function DayView({ entry, selectedDate, onAddClick, onDelete, onSaveNote }) {
-  const today = toDateString(new Date());
-  const isToday = selectedDate === today;
-  const dateLabel = formatFullDate(selectedDate);
+// Modal potwierdzenia usunięcia — ten sam ciemny design co reszta aplikacji.
+function ConfirmDeleteModal({ open, onCancel, onConfirm }) {
+  return (
+    <>
+      <div
+        className={`fixed inset-0 bg-black/60 z-[60] transition-opacity duration-200 ${
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onCancel}
+      />
+      <div className={`fixed inset-0 z-[70] flex items-center justify-center px-6 ${open ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+        <div
+          className={`w-full max-w-xs bg-elevated border border-border rounded-2xl p-5 transition-[transform,opacity] duration-200 ${
+            open ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+          }`}
+        >
+          <p className="text-txt font-display font-semibold text-base text-center">Usunąć wpis?</p>
+          <p className="text-txt-3 text-sm text-center mt-1.5">Czy na pewno chcesz usunąć ten wpis? Tej operacji nie można cofnąć.</p>
+          <div className="flex gap-2 mt-5">
+            <button
+              onClick={onCancel}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-border text-txt-2 hover:bg-surface transition-colors"
+            >
+              Anuluj
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:opacity-90 transition-opacity"
+            >
+              Usuń
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Zakładki Wskaźniki / Trendy — obramówka aktywnej zakładki zlana z kartą poniżej (efekt „teczki").
+function SectionTabs({ tab, onChange, children }) {
+  const TABS = [
+    { id: 'wskazniki', label: 'Wskaźniki', desc: 'Dzisiejsze parametry', Icon: GaugeIcon },
+    { id: 'trendy',    label: 'Trendy',    desc: 'Historia w czasie',    Icon: TrendsIcon },
+  ];
+  return (
+    <div className="rounded-2xl border border-border bg-surface">
+      <div className="grid grid-cols-2">
+        {TABS.map(({ id, label, desc, Icon }, i) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onChange(id)}
+              className={`flex items-center gap-3 p-3 text-left transition-colors
+                ${i === 0 ? 'rounded-tl-2xl border-r' : 'rounded-tr-2xl'} border-border
+                ${active ? 'bg-surface' : 'bg-bg/40 border-b'}`}
+            >
+              <span className={`shrink-0 flex items-center justify-center w-9 h-9 rounded-xl ${active ? 'text-recovery bg-recovery/10' : 'text-txt-3 bg-elevated'}`}>
+                <Icon size={18} />
+              </span>
+              <span className="min-w-0">
+                <span className={`block text-sm font-display font-semibold leading-tight ${active ? 'text-txt' : 'text-txt-2'}`}>{label}</span>
+                <span className="block text-txt-3 text-[11px] leading-tight">{desc}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+export default function DayView({ entry, days, selectedDate, entries, onSelect, onAddClick, onDelete, onSaveNote }) {
+  const [tab, setTab] = useState('wskazniki');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  // Przesuwanie palcem w lewo/prawo → zmiana dnia (karuzela podąża za selectedDate).
+  const swipeRef = useRef({ x: 0, y: 0, active: false });
+  const SWIPE_THRESHOLD = 50;
+
+  const goRelative = (delta) => {
+    if (!days || !onSelect) return;
+    const idx = days.indexOf(selectedDate);
+    if (idx === -1) return;
+    const next = idx + delta;
+    if (next >= 0 && next < days.length) onSelect(days[next]);
+  };
+
+  const onTouchStart = (e) => {
+    const t = e.touches[0];
+    swipeRef.current = { x: t.clientX, y: t.clientY, active: true };
+  };
+  const onTouchEnd = (e) => {
+    if (!swipeRef.current.active) return;
+    swipeRef.current.active = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - swipeRef.current.x;
+    const dy = t.clientY - swipeRef.current.y;
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return; // ignoruj pionowy ruch
+    goRelative(dx < 0 ? 1 : -1); // w lewo → następny dzień, w prawo → poprzedni
+  };
+
+  const swipeHandlers = { onTouchStart, onTouchEnd };
 
   // ── Dzień bez wpisu ──
   if (!entry) {
     return (
-      <div className="px-3 py-5 flex flex-col gap-6 max-w-3xl mx-auto w-full">
+      <div className="px-3 py-5 flex flex-col gap-6 max-w-3xl mx-auto w-full" {...swipeHandlers}>
         <div className="flex flex-col items-center justify-center gap-5 py-10">
-          <div className="text-center">
-            <p className="text-white font-semibold text-base capitalize">{dateLabel}</p>
-            <p className="text-gray-600 text-xs mt-1">
-              {isToday ? 'Brak wpisu na dziś' : 'Brak wpisu na ten dzień'}
-            </p>
-          </div>
-
           <button
-            onClick={onAddClick}
-            className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-[#2a2a2a] bg-transparent text-gray-200 text-sm font-semibold hover:bg-[#1c1c1e] active:scale-95 transition-all"
+            onClick={() => onAddClick()}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-recovery text-bg text-sm font-semibold hover:opacity-90 active:scale-95 transition-all"
           >
             <span className="text-lg leading-none">＋</span> Dodaj check-in
           </button>
-
-          <p className="text-gray-600 text-sm text-center leading-relaxed">
+          <p className="text-txt-3 text-sm text-center leading-relaxed">
             Uzupełnij dzienny check-in regeneracji
           </p>
         </div>
@@ -124,75 +198,72 @@ export default function DayView({ entry, selectedDate, onAddClick, onDelete, onS
   // ── Dashboard dnia ──
   const score = calcScore(entry);
   const label = scoreLabel(score);
-  const createdTime = formatTime(entry.createdAt);
-  const updatedTime = formatTime(entry.updatedAt);
-  const wasUpdated = entry.updatedAt && entry.createdAt
-    && new Date(entry.updatedAt) - new Date(entry.createdAt) > 60000;
-
-  const iconBtn = 'shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-gray-600 transition-colors';
+  const iconBtn = 'shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-txt-3 transition-colors';
 
   return (
-    <div className="px-3 py-5 flex flex-col gap-4 max-w-3xl mx-auto w-full">
-      {/* Główna karta dnia */}
-      <div className="bg-[#1c1c1e] rounded-2xl p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="min-w-0">
-            <p className="text-white font-semibold text-base capitalize">{dateLabel}</p>
-            {/* Znaczniki czasu — subtelne, pod datą */}
-            {(createdTime || updatedTime) && (
-              <p className="text-gray-600 text-[11px] mt-0.5">
-                {createdTime && <span>Utworzono {createdTime}</span>}
-                {wasUpdated && updatedTime && <span> · zaktualizowano {updatedTime}</span>}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onAddClick}
-              aria-label="Edytuj check-in"
-              className={`${iconBtn} hover:text-white hover:bg-[#252527]`}
-            >
-              <PencilIcon />
-            </button>
-            {onDelete && (
+    <div className="px-3 py-5 flex flex-col gap-4 max-w-3xl mx-auto w-full" {...swipeHandlers}>
+      <SectionTabs tab={tab} onChange={setTab}>
+        {tab === 'wskazniki' ? (
+          <>
+            <div className="flex items-start justify-end gap-1 mb-1">
               <button
-                onClick={() => onDelete(entry.id)}
-                aria-label="Usuń wpis"
-                className={`${iconBtn} hover:text-red-500 hover:bg-[#252527]`}
+                onClick={() => onAddClick()}
+                aria-label="Edytuj check-in"
+                className={`${iconBtn} hover:text-txt hover:bg-elevated`}
               >
-                <CloseIcon />
+                <PencilIcon />
               </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <CircularGauge value={score} max={100} color={label.color} size={88} strokeWidth={8} />
-          <div className="min-w-0">
-            <p className="text-base font-bold" style={{ color: label.color }}>{label.text}</p>
-            <p className="text-gray-500 text-xs mt-1">{dayDescription(entry)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Karta Recovery Check-in */}
-      <div className="bg-[#1c1c1e] rounded-2xl p-4">
-        <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-3">
-          Recovery Check-in
-        </p>
-        <div className="grid grid-cols-4 gap-2">
-          {METRICS.map(m => (
-            <div key={m.key} className="flex flex-col items-center gap-1.5">
-              <CircularGauge value={entry[m.key]} max={100} color={m.color} size={56} strokeWidth={5} />
-              <span className="text-base">{m.icon}</span>
-              <span className="text-gray-500 text-[10px] font-medium">{m.label}</span>
+              {onDelete && (
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  aria-label="Usuń wpis"
+                  className={`${iconBtn} hover:text-danger hover:bg-elevated`}
+                >
+                  <CloseIcon />
+                </button>
+              )}
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Notatka — edytowalna, z mikrofonem (placeholder transkrypcji) */}
-      <NoteCard key={entry.id} note={entry.note} onSave={onSaveNote} />
+            <div className="flex items-center gap-5">
+              {/* Duży zegar ogólnej regeneracji */}
+              <div className="shrink-0 flex flex-col items-center gap-2">
+                <CircularGauge value={score} max={100} color={label.color} size={120} strokeWidth={10} />
+                <p className="text-sm font-display font-bold text-center max-w-[120px] leading-tight" style={{ color: label.color }}>
+                  {label.text}
+                </p>
+              </div>
+
+              {/* Lista mniejszych zegarów — parametry od góry do dołu (klik → edycja) */}
+              <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                {METRICS.map(m => (
+                  <button
+                    key={m.key}
+                    onClick={() => onAddClick(m.key)}
+                    aria-label={`Edytuj: ${m.label}`}
+                    className="flex items-center gap-3 rounded-xl p-1.5 -mx-1.5 hover:bg-elevated transition-colors text-left"
+                  >
+                    <CircularGauge value={entry[m.key]} max={100} color={m.color} size={44} strokeWidth={4} />
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span style={{ color: m.color }}><m.Icon size={16} /></span>
+                      <span className="text-txt-2 text-sm font-medium leading-tight truncate">{m.label}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : (
+          <Trends entries={entries} />
+        )}
+      </SectionTabs>
+
+      {tab === 'wskazniki' && <NoteCard key={entry.id} note={entry.note} onSave={onSaveNote} />}
+
+      <ConfirmDeleteModal
+        open={confirmingDelete}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() => { setConfirmingDelete(false); onDelete(entry.id); }}
+      />
     </div>
   );
 }

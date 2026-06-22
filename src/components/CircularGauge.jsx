@@ -11,7 +11,7 @@ export default function CircularGauge({ value, max = 10, color, size = 80, strok
         <circle
           cx={center} cy={center} r={radius}
           fill="none"
-          stroke="#2a2a2a"
+          stroke="#2A332F"
           strokeWidth={strokeWidth}
         />
         <circle
@@ -23,12 +23,12 @@ export default function CircularGauge({ value, max = 10, color, size = 80, strok
           strokeDashoffset={offset}
           strokeLinecap="round"
           transform={`rotate(-90 ${center} ${center})`}
-          style={{ transition: 'stroke-dashoffset 0.4s ease' }}
+          style={{ transition: 'stroke-dashoffset 0.4s ease', filter: `drop-shadow(0 0 ${strokeWidth * 0.5}px ${color}66)` }}
         />
       </svg>
       <span
-        className="absolute font-bold"
-        style={{ color: 'white', fontSize: size * 0.19 }}
+        className="absolute font-mono font-semibold text-txt"
+        style={{ fontSize: size * 0.2 }}
       >
         {percentage}%
       </span>

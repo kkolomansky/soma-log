@@ -3,7 +3,7 @@
  * Wypełnienie to stonowany szary, uchwyt jasnoszary (kształt z globalnego CSS — index.css).
  */
 const FILL = '#52525b';
-const TRACK = '#2a2a2a';
+const TRACK = '#2A332F';
 
 export default function Slider({ value, onChange, min = 0, max = 100, className = '' }) {
   const pct = ((value - min) / (max - min)) * 100;

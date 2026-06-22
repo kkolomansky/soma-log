@@ -8,7 +8,6 @@ import DayStrip from './components/DayStrip';
 import DayView from './components/DayView';
 import InputBar from './components/InputBar';
 import AddEntryModal from './components/AddEntryModal';
-import TrendsOverlay from './components/TrendsOverlay';
 import Auth from './screens/Auth';
 
 const DAYS = buildLast30Days();
@@ -16,7 +15,7 @@ const DAYS = buildLast30Days();
 export default function App() {
   const [selectedDate, setSelectedDate] = useState(() => toDateString(new Date()));
   const [showAddModal, setShowAddModal]  = useState(false);
-  const [showTrends,   setShowTrends]    = useState(false);
+  const [editFocusKey, setEditFocusKey]  = useState(null);
   const [modulesOpen,  setModulesOpen]   = useState(false);
 
   const { session, loading: authLoading, signIn, signUp, signOut } = useAuth();
@@ -25,19 +24,25 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="bg-[#111111] min-h-screen flex items-center justify-center">
-        <p className="text-gray-600 text-sm">Ładowanie…</p>
+      <div className="bg-bg min-h-screen flex items-center justify-center">
+        <p className="text-txt-3 text-sm">Ładowanie…</p>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="bg-[#111111] min-h-screen max-w-md mx-auto">
+      <div className="bg-bg min-h-screen max-w-md mx-auto">
         <Auth onSignIn={signIn} onSignUp={signUp} />
       </div>
     );
   }
+
+  // Otwiera modal dodawania/edycji; opcjonalny klucz parametru → przewinięcie do niego.
+  const handleAddClick = (key = null) => {
+    setEditFocusKey(typeof key === 'string' ? key : null);
+    setShowAddModal(true);
+  };
 
   const selectedEntry = entriesByDate.get(selectedDate) ?? null;
 
@@ -50,8 +55,8 @@ export default function App() {
   // Zapis samej notatki (edycja inline w podglądzie dnia) — zachowuje pozostałe parametry.
   const handleSaveNote = async (note) => {
     if (!selectedEntry) return;
-    const { mood, recovery, sleep, doms } = selectedEntry;
-    await saveEntry(selectedDate, { mood, recovery, sleep, doms, note });
+    const { sleep, energy, motivation, fatigue, doms, stress } = selectedEntry;
+    await saveEntry(selectedDate, { sleep, energy, motivation, fatigue, doms, stress, note });
   };
 
   return (
@@ -59,10 +64,7 @@ export default function App() {
       modulesOpen={modulesOpen}
       onToggleModules={() => setModulesOpen(o => !o)}
       header={
-        <Header
-          onTrendsClick={() => setShowTrends(true)}
-          onSignOut={signOut}
-        />
+        <Header onSignOut={signOut} />
       }
       dayStrip={
         <DayStrip
@@ -75,8 +77,11 @@ export default function App() {
       dayView={
         <DayView
           entry={selectedEntry}
+          days={DAYS}
           selectedDate={selectedDate}
-          onAddClick={() => setShowAddModal(true)}
+          entries={entries}
+          onSelect={setSelectedDate}
+          onAddClick={handleAddClick}
           onDelete={deleteEntry}
           onSaveNote={handleSaveNote}
         />
@@ -85,20 +90,14 @@ export default function App() {
         <InputBar />
       }
       modals={
-        <>
-          <AddEntryModal
-            open={showAddModal}
-            onClose={() => setShowAddModal(false)}
-            onSave={handleSave}
-            initialEntry={selectedEntry}
-            selectedDate={selectedDate}
-          />
-          <TrendsOverlay
-            open={showTrends}
-            onClose={() => setShowTrends(false)}
-            entries={entries}
-          />
-        </>
+        <AddEntryModal
+          open={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSave={handleSave}
+          initialEntry={selectedEntry}
+          selectedDate={selectedDate}
+          focusKey={editFocusKey}
+        />
       }
     />
   );

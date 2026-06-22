@@ -1,6 +1,8 @@
-// Wszystkie parametry w skali 0–100. DOMS odwrócony (niżej = lepiej → 100 - doms).
+// Wszystkie parametry w skali 0–100. Zmęczenie/bolesność/stres odwrócone (niżej = lepiej → 100 - v).
 export function calcScore(entry) {
-  return Math.round((entry.mood + entry.recovery + entry.sleep + (100 - entry.doms)) / 4);
+  const positive = entry.sleep + entry.energy + entry.motivation;
+  const negative = (100 - entry.fatigue) + (100 - entry.doms) + (100 - entry.stress);
+  return Math.round((positive + negative) / 6);
 }
 
 // 5 poziomów regeneracji co 20 (czerwony → zielony).

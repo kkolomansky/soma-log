@@ -95,12 +95,12 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
-  const arrowBtn = 'shrink-0 w-9 h-9 rounded-full bg-[#1c1c1e] border border-[#2a2a2a] text-gray-400 hover:text-white hover:bg-[#252525] flex items-center justify-center transition-colors';
+  const arrowBtn = 'shrink-0 w-9 h-9 rounded-full bg-surface border border-border text-txt-2 hover:text-txt hover:bg-elevated flex items-center justify-center transition-colors';
   const sidePad = `calc(50% - ${ITEM_W / 2}px)`;
 
   return (
-    <div className="select-none border-b border-[#1e1e1e]">
-      <p className="text-center text-gray-500 text-xs font-semibold uppercase tracking-wide pt-3 pb-1 capitalize">
+    <div className="select-none border-b border-divider">
+      <p className="text-center text-txt-3 text-xs font-display font-semibold uppercase tracking-wide pt-3 pb-1 capitalize">
         {formatMonthYear(centerDate)}
       </p>
 
@@ -128,15 +128,15 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }
                 onClick={() => centerOn(dateStr)}
                 style={{ scrollSnapAlign: 'center', transformOrigin: 'center', borderColor: col ?? undefined }}
                 className={`relative shrink-0 w-[72px] h-[72px] rounded-full flex flex-col items-center justify-center will-change-transform transition-[background-color,border-color]
-                  ${entry ? 'border-2' : 'border border-[#2a2a2a]'}
-                  ${isToday ? 'ring-2 ring-white/40 ring-offset-2 ring-offset-[#111111]' : ''}
-                  ${isCenter ? 'bg-white/10' : 'bg-[#1c1c1e]'}`}
+                  ${entry ? 'border-2' : 'border border-border'}
+                  ${isToday ? 'ring-2 ring-white/40 ring-offset-2 ring-offset-bg' : ''}
+                  ${isCenter ? 'bg-white/10' : 'bg-surface'}`}
               >
-                <span className={`text-lg font-bold leading-none ${isCenter ? 'text-white' : 'text-gray-300'}`}>{day}</span>
+                <span className={`text-lg font-display font-bold leading-none ${isCenter ? 'text-txt' : 'text-txt-2'}`}>{day}</span>
                 {sc != null ? (
-                  <span className="text-[11px] font-semibold leading-none mt-1" style={{ color: col }}>{sc}%</span>
+                  <span className="text-[11px] font-mono font-semibold leading-none mt-1" style={{ color: col }}>{sc}%</span>
                 ) : (
-                  <span className="w-1 h-1 rounded-full bg-[#3a3a3a] mt-1.5" />
+                  <span className="w-1 h-1 rounded-full bg-border-strong mt-1.5" />
                 )}
               </button>
             );
