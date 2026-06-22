@@ -1,9 +1,4 @@
-const METRICS = [
-  { key: 'mood',     label: 'Mood',     icon: '😊', color: '#22c55e' },
-  { key: 'recovery', label: 'Recovery', icon: '⚡', color: '#eab308' },
-  { key: 'sleep',    label: 'Sleep',    icon: '🌙', color: '#818cf8' },
-  { key: 'doms',     label: 'DOMS',     icon: '🔥', color: '#f97316' },
-];
+import { METRICS } from '../utils/metrics';
 
 export default function TrendChart({ entries }) {
   if (!entries || entries.length === 0) return null;
@@ -18,7 +13,7 @@ export default function TrendChart({ entries }) {
   const xPos = (i) =>
     padL + (sorted.length > 1 ? (i / (sorted.length - 1)) * chartW : chartW / 2);
   const yPos = (val) =>
-    padT + chartH - ((val - 1) / 9) * chartH;
+    padT + chartH - (val / 100) * chartH;
 
   const makePath = (key) =>
     sorted
@@ -37,13 +32,13 @@ export default function TrendChart({ entries }) {
     <div className="w-full">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
         {/* Horizontal grid lines + Y labels */}
-        {[2, 4, 6, 8, 10].map(v => {
+        {[20, 40, 60, 80, 100].map(v => {
           const y = yPos(v);
           return (
             <g key={v}>
-              <line x1={padL} x2={W - padR} y1={y} y2={y} stroke="#252525" strokeWidth="1" />
+              <line x1={padL} x2={W - padR} y1={y} y2={y} stroke="#2A332F" strokeWidth="1" />
               <text x={padL - 5} y={y} textAnchor="end" dominantBaseline="middle"
-                fill="#4b5563" fontSize="9">{v}</text>
+                fill="#71717A" fontSize="9" fontFamily="'Geist Mono', monospace">{v}</text>
             </g>
           );
         })}
@@ -66,7 +61,7 @@ export default function TrendChart({ entries }) {
                 cy={yPos(e[m.key]).toFixed(1)}
                 r="3.5"
                 fill={m.color}
-                stroke="#1c1c1e"
+                stroke="#151A18"
                 strokeWidth="1.5"
               />
             ))}
@@ -76,7 +71,7 @@ export default function TrendChart({ entries }) {
         {/* X axis date labels */}
         {labelIndices.map(i => (
           <text key={i} x={xPos(i).toFixed(1)} y={H - 4}
-            textAnchor="middle" fill="#4b5563" fontSize="9">
+            textAnchor="middle" fill="#71717A" fontSize="9" fontFamily="'Geist Mono', monospace">
             {new Date(sorted[i].timestamp).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
           </text>
         ))}
@@ -86,8 +81,8 @@ export default function TrendChart({ entries }) {
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
         {METRICS.map(m => (
           <div key={m.key} className="flex items-center gap-1.5">
-            <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: m.color }} />
-            <span className="text-gray-500 text-xs">{m.icon} {m.label}</span>
+            <span style={{ color: m.color }}><m.Icon size={14} /></span>
+            <span className="text-txt-2 text-xs">{m.label}</span>
           </div>
         ))}
       </div>

@@ -2,7 +2,7 @@ import ModulesPanel from '../components/ModulesPanel';
 
 export default function AppLayout({ header, dayStrip, dayView, inputBar, modals, modulesOpen, onToggleModules }) {
   return (
-    <div className="flex h-screen bg-[#111111]">
+    <div className="flex h-screen bg-bg">
       {/* Lewy panel modułów — rozwijalny sidebar na desktopie */}
       <ModulesPanel variant="sidebar" open={modulesOpen} onToggle={onToggleModules} />
 
