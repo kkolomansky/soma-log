@@ -2,18 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { formatFullDate } from '../utils/dateUtils';
 import { METRICS, METRIC_DEFAULTS } from '../utils/metrics';
 import Slider from './Slider';
-
-function MicIcon({ size = 18 }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none"
-      stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-      <path d="M19 10v2a7 7 0 01-14 0v-2" />
-      <line x1="12" y1="19" x2="12" y2="23" />
-      <line x1="8" y1="23" x2="16" y2="23" />
-    </svg>
-  );
-}
+import MicButton from './MicButton';
+import { NoteIcon } from './icons';
+import { useAutoGrow } from '../hooks/useAutoGrow';
 
 function pickMetrics(entry) {
   return Object.fromEntries(METRICS.map(m => [m.key, entry[m.key]]));
@@ -33,6 +24,8 @@ export default function AddEntryModal({ open, onClose, onSave, initialEntry = nu
 
   // Referencje wierszy parametrów — do przewinięcia po kliknięciu konkretnego parametru.
   const rowRefs = useRef({});
+  const noteRef = useRef(null);
+  useAutoGrow(noteRef, note, 5);
 
   useEffect(() => {
     if (open) {
@@ -153,26 +146,23 @@ export default function AddEntryModal({ open, onClose, onSave, initialEntry = nu
               ))}
             </div>
 
-            {/* Notatka */}
+            {/* Notatka — mikrofon na wysokości etykiety, dyktowanie dopisuje tekst */}
             <div className="bg-surface border border-border rounded-2xl p-4 mb-3">
-              <p className="text-txt-3 text-xs mb-2 font-medium uppercase tracking-wide">Notatka</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="flex items-center gap-1.5 text-txt-3 text-xs font-medium uppercase tracking-wide">
+                  <span className="text-txt-3"><NoteIcon size={14} /></span>
+                  Notatka
+                </p>
+                <MicButton onResult={t => setNote(n => (n ? `${n} ${t}` : t))} size={28} iconSize={15} />
+              </div>
               <textarea
+                ref={noteRef}
                 value={note}
                 onChange={e => setNote(e.target.value)}
                 placeholder="Co dzisiaj czujesz? Jak był trening?"
-                className="w-full bg-transparent text-txt placeholder-txt-3 text-sm resize-none outline-none leading-relaxed"
-                rows={2}
+                className="w-full bg-transparent text-txt placeholder-txt-3 text-[11px] resize-none outline-none leading-relaxed text-justify"
+                rows={1}
               />
-              {/* Mikrofon — placeholder transkrypcji (logika w kolejnym kroku) */}
-              <button
-                type="button"
-                disabled
-                title="Transkrypcja głosowa — wkrótce"
-                className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-border text-txt-3 cursor-not-allowed"
-              >
-                <MicIcon />
-                <span className="text-xs">Transkrypcja głosowa — wkrótce</span>
-              </button>
             </div>
 
             <button

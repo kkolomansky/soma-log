@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import CircularGauge from './CircularGauge';
 import Trends from '../screens/Trends';
+import AiSummaryCard from './AiSummaryCard';
+import LoganExcerpt from './LoganExcerpt';
+import MicButton from './MicButton';
+import { useAutoGrow } from '../hooks/useAutoGrow';
 import { calcScore, scoreLabel } from '../utils/recoveryScore';
 import { METRICS } from '../utils/metrics';
-import { GaugeIcon, TrendsIcon } from './icons';
+import { GaugeIcon, TrendsIcon, NoteIcon } from './icons';
 
 function CloseIcon({ size = 16 }) {
   return (
@@ -25,48 +29,43 @@ function PencilIcon({ size = 15 }) {
   );
 }
 
-function MicIcon({ size = 18 }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none"
-      stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-      <path d="M19 10v2a7 7 0 01-14 0v-2" />
-      <line x1="12" y1="19" x2="12" y2="23" />
-      <line x1="8" y1="23" x2="16" y2="23" />
-    </svg>
-  );
-}
-
-// Edytowalna notatka dnia. Pusta → mikrofon na środku; wypełniona → mikrofon po prawej.
+// Edytowalna notatka dnia. Mikrofon na wysokości etykiety (prawa); dyktowanie dopisuje tekst.
+// Tekst rośnie do 5 wierszy, potem wewnętrzny scroll (nie nachodzi na mikrofon w nagłówku).
 function NoteCard({ note, onSave }) {
   const [draft, setDraft] = useState(note ?? '');
+  const taRef = useRef(null);
   useEffect(() => { setDraft(note ?? ''); }, [note]);
+  useAutoGrow(taRef, draft, 5);
 
-  const hasText = draft.trim().length > 0;
   const handleBlur = () => {
     if (draft.trim() !== (note ?? '').trim()) onSave(draft.trim());
   };
 
+  // Transkrypcja głosowa: dopisz i zapisz od razu (klik mikrofonu zabiera fokus z pola).
+  const appendVoice = (text) => {
+    const next = (draft ? `${draft} ${text}` : text).trim();
+    setDraft(next);
+    onSave(next);
+  };
+
   return (
     <div className="bg-surface border border-border rounded-2xl p-4">
-      <p className="text-txt-3 text-xs font-medium uppercase tracking-wide mb-2">Notatka</p>
-      <div className="relative">
-        <textarea
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onBlur={handleBlur}
-          rows={hasText ? 3 : 2}
-          className={`w-full bg-transparent text-txt-2 placeholder-txt-3 text-sm resize-none outline-none leading-relaxed ${hasText ? 'pr-9' : ''}`}
-        />
-        <div
-          title="Transkrypcja głosowa — wkrótce"
-          className={`pointer-events-none absolute text-txt-3 ${
-            hasText ? 'right-0 top-0' : 'inset-0 flex items-center justify-center'
-          }`}
-        >
-          <MicIcon />
-        </div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="flex items-center gap-1.5 text-txt-3 text-xs font-medium uppercase tracking-wide">
+          <span className="text-txt-3"><NoteIcon size={14} /></span>
+          Notatka
+        </p>
+        <MicButton onResult={appendVoice} size={28} iconSize={15} />
       </div>
+      <textarea
+        ref={taRef}
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={handleBlur}
+        rows={1}
+        placeholder="Zapisz notatkę lub podyktuj ją głosem…"
+        className="w-full bg-transparent text-txt-2 placeholder-txt-3 text-[11px] resize-none outline-none leading-relaxed text-justify"
+      />
     </div>
   );
 }
@@ -144,7 +143,7 @@ function SectionTabs({ tab, onChange, children }) {
   );
 }
 
-export default function DayView({ entry, days, selectedDate, entries, onSelect, onAddClick, onDelete, onSaveNote }) {
+export default function DayView({ entry, days, selectedDate, entries, onSelect, onAddClick, onDelete, onSaveNote, onAnalyze }) {
   const [tab, setTab] = useState('wskazniki');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -198,38 +197,46 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
   // ── Dashboard dnia ──
   const score = calcScore(entry);
   const label = scoreLabel(score);
-  const iconBtn = 'shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-txt-3 transition-colors';
+  const iconBtn = 'shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-txt-3 transition-colors';
 
   return (
     <div className="px-3 py-5 flex flex-col gap-4 max-w-3xl mx-auto w-full" {...swipeHandlers}>
+      {/* Pasek akcji dnia (edycja / usuwanie) — w górnym rogu, nad kartą wskaźników */}
+      {tab === 'wskazniki' && (
+        <div className="flex items-center justify-end gap-1 -mb-2 -mt-1 pr-1">
+          <button
+            onClick={() => onAddClick()}
+            aria-label="Edytuj check-in"
+            className={`${iconBtn} hover:text-txt hover:bg-elevated`}
+          >
+            <PencilIcon size={14} />
+          </button>
+          {onDelete && (
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              aria-label="Usuń wpis"
+              className={`${iconBtn} hover:text-danger hover:bg-elevated`}
+            >
+              <CloseIcon size={14} />
+            </button>
+          )}
+        </div>
+      )}
+
       <SectionTabs tab={tab} onChange={setTab}>
         {tab === 'wskazniki' ? (
           <>
-            <div className="flex items-center justify-end gap-1 mb-1">
-              <button
-                onClick={() => onAddClick()}
-                aria-label="Edytuj check-in"
-                className={`${iconBtn} hover:text-txt hover:bg-elevated`}
-              >
-                <PencilIcon />
-              </button>
-              {onDelete && (
-                <button
-                  onClick={() => setConfirmingDelete(true)}
-                  aria-label="Usuń wpis"
-                  className={`${iconBtn} hover:text-danger hover:bg-elevated`}
-                >
-                  <CloseIcon />
-                </button>
-              )}
-            </div>
-
-            {/* Duży zegar ogólnej regeneracji — na górze, wyśrodkowany */}
-            <div className="flex flex-col items-center gap-2 mb-6">
-              <CircularGauge value={score} max={100} color={label.color} size={170} strokeWidth={12} />
-              <p className="text-base font-display font-bold text-center leading-tight" style={{ color: label.color }}>
-                {label.text}
-              </p>
+            {/* Zegar regeneracji (lewo, mniejszy) + wyciąg analizy Logana (prawo) */}
+            <div className="flex items-stretch gap-3 mb-6">
+              <div className="flex flex-col items-center justify-center gap-1.5 shrink-0 w-[108px]">
+                <CircularGauge value={score} max={100} color={label.color} size={108} strokeWidth={9} />
+                <p className="text-sm font-display font-bold text-center leading-tight" style={{ color: label.color }}>
+                  {label.text}
+                </p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <LoganExcerpt short={entry.aiSummaryShort} onAnalyze={onAnalyze} />
+              </div>
             </div>
 
             {/* Parametry — stała siatka 3×2, równomiernie rozłożone (klik → edycja) */}
@@ -255,7 +262,12 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
         )}
       </SectionTabs>
 
-      {tab === 'wskazniki' && <NoteCard key={entry.id} note={entry.note} onSave={onSaveNote} />}
+      {tab === 'wskazniki' && (
+        <>
+          <NoteCard key={entry.id} note={entry.note} onSave={onSaveNote} />
+          <AiSummaryCard summary={entry.aiSummary} onAnalyze={onAnalyze} />
+        </>
+      )}
 
       <ConfirmDeleteModal
         open={confirmingDelete}

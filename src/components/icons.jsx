@@ -135,3 +135,62 @@ export function GaugeIcon(props) {
 export function TrendsIcon(props) {
   return <Svg {...props}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></Svg>;
 }
+
+// Wyloguj — drzwi ze strzałką
+export function LogoutIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </Svg>
+  );
+}
+
+// Profil użytkownika — sylwetka
+export function UserIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </Svg>
+  );
+}
+
+// Głos / odczyt — głośnik z falami
+export function SpeakerIcon(props) {
+  return (
+    <Svg {...props}>
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+    </Svg>
+  );
+}
+
+// Odśwież — kołowe strzałki
+export function RefreshIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <polyline points="21 3 21 9 15 9" />
+    </Svg>
+  );
+}
+
+// Stop — kwadrat (zatrzymanie odtwarzania głosu)
+export function StopIcon(props) {
+  return <Svg {...props}><rect x="6" y="6" width="12" height="12" rx="2" /></Svg>;
+}
+
+// Notatka — kartka z liniami i zagiętym rogiem
+export function NoteIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M14 3v5h5" />
+      <line x1="8" y1="13" x2="16" y2="13" />
+      <line x1="8" y1="17" x2="13" y2="17" />
+    </Svg>
+  );
+}

@@ -59,6 +59,27 @@ input[type='range']::-moz-range-thumb {
   cursor: pointer;
 }
 
+/* Animacja „agent myśli" — rysowanie linii EKG + delikatny puls pierścienia.
+   pathLength=100 normalizuje długość polyline, więc dasharray operuje w 0–100. */
+@keyframes ekg-draw {
+  0%   { stroke-dashoffset: 100; }
+  55%  { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -100; }
+}
+@keyframes ekg-ring {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.94); }
+}
+.ekg-draw {
+  stroke-dasharray: 100;
+  animation: ekg-draw 1.6s ease-in-out infinite;
+}
+.ekg-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ekg-ring 1.6s ease-in-out infinite;
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
