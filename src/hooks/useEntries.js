@@ -15,6 +15,8 @@ function fromRow(row) {
     doms: row.doms,
     stress: row.stress,
     note: row.note ?? '',
+    aiSummary: row.ai_summary ?? '',         // pełna analiza Logana
+    aiSummaryShort: row.ai_summary_short ?? '', // krótki wyciąg (obok zegara)
   };
 }
 
@@ -85,6 +87,27 @@ export function useEntries(userId) {
     return saved;
   }, [userId]);
 
+  // Zapis analizy Logana dla danego dnia (pełna + skrót), osobno od parametrów/notatki.
+  const updateSummary = useCallback(async (dateStr, { full, short }) => {
+    if (!userId) return null;
+    const { data, error } = await supabase
+      .from(ENTRIES_TABLE)
+      .update({ ai_summary: full, ai_summary_short: short })
+      .eq('user_id', userId)
+      .eq('entry_date', dateStr)
+      .select()
+      .single();
+
+    if (error) {
+      setError(error.message);
+      return null;
+    }
+
+    const saved = fromRow(data);
+    setEntries(prev => prev.map(e => (e.entryDate === saved.entryDate ? saved : e)));
+    return saved;
+  }, [userId]);
+
   const deleteEntry = useCallback(async (id) => {
     const prev = entries;
     setEntries(prev.filter(e => e.id !== id));
@@ -100,5 +123,5 @@ export function useEntries(userId) {
     }
   }, [entries]);
 
-  return { entries, entriesByDate, saveEntry, deleteEntry, loading, error, reload: loadEntries };
+  return { entries, entriesByDate, saveEntry, updateSummary, deleteEntry, loading, error, reload: loadEntries };
 }

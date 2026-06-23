@@ -1,5 +1,6 @@
 // Znak marki Soma.Log: pełny zielony pierścień z białą linią pulsu (EKG) w środku.
-export function LogoMark({ size = 36, className = '', style }) {
+// `thinking` → animacja EKG (rysowanie linii + puls pierścienia) jako wskaźnik „agent myśli".
+export function LogoMark({ size = 36, className = '', style, thinking = false }) {
   return (
     <svg
       viewBox="0 0 64 64"
@@ -11,7 +12,11 @@ export function LogoMark({ size = 36, className = '', style }) {
       xmlns="http://www.w3.org/2000/svg"
     >
       {/* Pierścień */}
-      <circle cx="32" cy="32" r="25" stroke="#22C55E" strokeWidth="4" />
+      <circle
+        cx="32" cy="32" r="25"
+        stroke="#22C55E" strokeWidth="4"
+        className={thinking ? 'ekg-ring' : undefined}
+      />
       {/* Puls — pozioma linia bazowa z jednym wyraźnym skokiem */}
       <polyline
         points="13,32 22,32 26,22 32,43 38,24 42,32 51,32"
@@ -19,6 +24,8 @@ export function LogoMark({ size = 36, className = '', style }) {
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
+        pathLength="100"
+        className={thinking ? 'ekg-draw' : undefined}
       />
     </svg>
   );

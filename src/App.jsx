@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useEntries } from './hooks/useEntries';
+import { useChat } from './hooks/useChat';
+import { summarizeDay } from './lib/agent';
 import { toDateString, buildLast30Days } from './utils/dateUtils';
 import AppLayout from './layouts/AppLayout';
 import Header from './components/Header';
 import DayStrip from './components/DayStrip';
 import DayView from './components/DayView';
 import InputBar from './components/InputBar';
+import ChatPanel from './components/ChatPanel';
 import AddEntryModal from './components/AddEntryModal';
 import Auth from './screens/Auth';
 
@@ -17,10 +20,16 @@ export default function App() {
   const [showAddModal, setShowAddModal]  = useState(false);
   const [editFocusKey, setEditFocusKey]  = useState(null);
   const [modulesOpen,  setModulesOpen]   = useState(false);
+  const [showChat,     setShowChat]      = useState(false);
+  const [draft,        setDraft]         = useState('');
 
   const { session, loading: authLoading, signIn, signUp, signOut } = useAuth();
   const userId = session?.user?.id ?? null;
-  const { entries, entriesByDate, saveEntry, deleteEntry } = useEntries(userId);
+  const { entries, entriesByDate, saveEntry, updateSummary, deleteEntry } = useEntries(userId);
+  const { messages, sending, error: chatError, sendMessage } = useChat(userId, selectedDate);
+
+  // Zmiana dnia → czysty composer i zamknięta rozmowa (wątek ładuje się dla nowego dnia).
+  useEffect(() => { setDraft(''); setShowChat(false); }, [selectedDate]);
 
   if (authLoading) {
     return (
@@ -59,6 +68,19 @@ export default function App() {
     await saveEntry(selectedDate, { sleep, energy, motivation, fatigue, doms, stress, note });
   };
 
+  // Wysłanie wiadomości do agenta — czyści composer i otwiera rozmowę dnia.
+  const handleSend = (text) => {
+    setDraft('');
+    setShowChat(true);
+    sendMessage(text);
+  };
+
+  // „Analizuj dzień" → analiza Logana (pełna + skrót) zapisana w soma_entries.
+  const handleAnalyze = async () => {
+    const { full, short } = await summarizeDay({ entryDate: selectedDate });
+    await updateSummary(selectedDate, { full, short });
+  };
+
   return (
     <AppLayout
       modulesOpen={modulesOpen}
@@ -84,20 +106,41 @@ export default function App() {
           onAddClick={handleAddClick}
           onDelete={deleteEntry}
           onSaveNote={handleSaveNote}
+          onAnalyze={handleAnalyze}
         />
       }
       inputBar={
-        <InputBar />
+        <InputBar
+          draft={draft}
+          onDraftChange={setDraft}
+          onSend={handleSend}
+          sending={sending}
+          onOpenChat={() => setShowChat(true)}
+          hidden={showChat}
+        />
       }
       modals={
-        <AddEntryModal
-          open={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          onSave={handleSave}
-          initialEntry={selectedEntry}
-          selectedDate={selectedDate}
-          focusKey={editFocusKey}
-        />
+        <>
+          <AddEntryModal
+            open={showAddModal}
+            onClose={() => setShowAddModal(false)}
+            onSave={handleSave}
+            initialEntry={selectedEntry}
+            selectedDate={selectedDate}
+            focusKey={editFocusKey}
+          />
+          <ChatPanel
+            open={showChat}
+            onClose={() => setShowChat(false)}
+            dateStr={selectedDate}
+            messages={messages}
+            sending={sending}
+            error={chatError}
+            draft={draft}
+            onDraftChange={setDraft}
+            onSend={handleSend}
+          />
+        </>
       }
     />
   );
