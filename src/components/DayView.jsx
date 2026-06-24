@@ -41,21 +41,20 @@ function NoteCard({ note, onSave }) {
     if (draft.trim() !== (note ?? '').trim()) onSave(draft.trim());
   };
 
-  // Transkrypcja głosowa: dopisz i zapisz od razu (klik mikrofonu zabiera fokus z pola).
-  const appendVoice = (text) => {
-    const next = (draft ? `${draft} ${text}` : text).trim();
-    setDraft(next);
-    onSave(next);
+  // Dyktowanie na żywo: aktualizuj pole na bieżąco, zapisz po zakończeniu (isFinal).
+  const onVoice = (joined, isFinal) => {
+    setDraft(joined);
+    if (isFinal) onSave(joined.trim());
   };
 
   return (
     <div className="bg-surface border border-border rounded-2xl p-4">
       <div className="flex items-center justify-between mb-2">
         <p className="flex items-center gap-1.5 text-txt-3 text-xs font-medium uppercase tracking-wide">
-          <span className="text-txt-3"><NoteIcon size={14} /></span>
+          <span className="text-[#0E7490]"><NoteIcon size={14} /></span>
           Notatka
         </p>
-        <MicButton onResult={appendVoice} size={28} iconSize={15} />
+        <MicButton getText={() => draft} onText={onVoice} size={28} iconSize={15} />
       </div>
       <textarea
         ref={taRef}
@@ -64,7 +63,7 @@ function NoteCard({ note, onSave }) {
         onBlur={handleBlur}
         rows={1}
         placeholder="Zapisz notatkę lub podyktuj ją głosem…"
-        className="w-full bg-transparent text-txt-2 placeholder-txt-3 text-[11px] resize-none outline-none leading-relaxed text-justify"
+        className="w-full bg-transparent text-txt-2 placeholder-txt-3 text-[11px] resize-none outline-none leading-relaxed pr-2 md:text-justify"
       />
     </div>
   );
@@ -147,6 +146,17 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
   const [tab, setTab] = useState('wskazniki');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  // Widok webowy (md+) → zegar i Podsumowanie Logana dzielą okno wskaźników po równo.
+  const [isWide, setIsWide] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = e => setIsWide(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   // Przesuwanie palcem w lewo/prawo → zmiana dnia (karuzela podąża za selectedDate).
   const swipeRef = useRef({ x: 0, y: 0, active: false });
   const SWIPE_THRESHOLD = 50;
@@ -201,36 +211,35 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
 
   return (
     <div className="px-3 py-5 flex flex-col gap-4 max-w-3xl mx-auto w-full" {...swipeHandlers}>
-      {/* Pasek akcji dnia (edycja / usuwanie) — w górnym rogu, nad kartą wskaźników */}
-      {tab === 'wskazniki' && (
-        <div className="flex items-center justify-end gap-1 -mb-2 -mt-1 pr-1">
+      {/* Pasek akcji dnia (edycja / usuwanie) — zawsze widoczny, by zmiana zakładki nie podnosiła karty */}
+      <div className="flex items-center justify-end gap-1 -mb-2 -mt-1 pr-1">
+        <button
+          onClick={() => onAddClick()}
+          aria-label="Edytuj check-in"
+          className={`${iconBtn} hover:text-txt hover:bg-elevated`}
+        >
+          <PencilIcon size={14} />
+        </button>
+        {onDelete && (
           <button
-            onClick={() => onAddClick()}
-            aria-label="Edytuj check-in"
-            className={`${iconBtn} hover:text-txt hover:bg-elevated`}
+            onClick={() => setConfirmingDelete(true)}
+            aria-label="Usuń wpis"
+            className={`${iconBtn} hover:text-danger hover:bg-elevated`}
           >
-            <PencilIcon size={14} />
+            <CloseIcon size={14} />
           </button>
-          {onDelete && (
-            <button
-              onClick={() => setConfirmingDelete(true)}
-              aria-label="Usuń wpis"
-              className={`${iconBtn} hover:text-danger hover:bg-elevated`}
-            >
-              <CloseIcon size={14} />
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       <SectionTabs tab={tab} onChange={setTab}>
         {tab === 'wskazniki' ? (
           <>
-            {/* Zegar regeneracji (lewo, mniejszy) + wyciąg analizy Logana (prawo) */}
+            {/* Zegar regeneracji + Podsumowanie Logana. Mobile: zegar kompaktowy + moduł.
+                Web (md+): obie połówki po równo, większy zegar. */}
             <div className="flex items-stretch gap-3 mb-6">
-              <div className="flex flex-col items-center justify-center gap-1.5 shrink-0 w-[108px]">
-                <CircularGauge value={score} max={100} color={label.color} size={108} strokeWidth={9} />
-                <p className="text-sm font-display font-bold text-center leading-tight" style={{ color: label.color }}>
+              <div className="flex flex-col items-center justify-center gap-1.5 shrink-0 w-[108px] md:w-auto md:flex-1">
+                <CircularGauge value={score} max={100} color={label.color} size={isWide ? 156 : 108} strokeWidth={isWide ? 12 : 9} />
+                <p className="text-sm md:text-base font-display font-bold text-center leading-tight" style={{ color: label.color }}>
                   {label.text}
                 </p>
               </div>

@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { useVoiceTranscription } from '../hooks/useVoiceTranscription';
+import { useDictation } from '../hooks/useDictation';
 import { useAutoGrow } from '../hooks/useAutoGrow';
 
 function MicIcon({ size = 18 }) {
@@ -46,9 +46,10 @@ export default function Composer({
   const taRef = useRef(null);
   useAutoGrow(taRef, value, 4);
 
-  const { recording, transcribing, error: micError, toggle } = useVoiceTranscription(
-    (text) => onChange(value ? `${value} ${text}` : text),
-  );
+  const { listening, transcribing, error: micError, start, stop } = useDictation({
+    getText: () => value,
+    onText: (joined) => onChange(joined),
+  });
 
   useEffect(() => {
     if (autoFocus && taRef.current) taRef.current.focus();
@@ -79,12 +80,16 @@ export default function Composer({
         />
         <button
           type="button"
-          onClick={toggle}
+          onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); start(); }}
+          onPointerUp={stop}
+          onPointerLeave={stop}
+          onPointerCancel={stop}
           disabled={transcribing || sending}
-          title={recording ? 'Zatrzymaj nagrywanie' : 'Nagraj głos'}
-          aria-label={recording ? 'Zatrzymaj nagrywanie' : 'Nagraj głos'}
-          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-            recording
+          title={listening ? 'Puść, aby zakończyć' : 'Przytrzymaj i mów'}
+          aria-label="Dyktuj głosem (przytrzymaj)"
+          style={{ touchAction: 'none' }}
+          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors select-none ${
+            listening
               ? 'bg-danger/20 text-danger animate-pulse'
               : 'bg-elevated text-txt-3 hover:text-txt'
           } disabled:opacity-50`}

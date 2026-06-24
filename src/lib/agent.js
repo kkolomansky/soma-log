@@ -1,15 +1,42 @@
 import { supabase } from './supabase';
+import { getVoice } from './voice';
 
 // Wrappery na Edge Functions agenta. supabase.functions.invoke dokleja JWT i apikey.
 
-// Rozmowa z agentem dla danego dnia. history = [{ role, content }] (bez systemu).
-export async function chatWithAgent({ entryDate, history }) {
-  const { data, error } = await supabase.functions.invoke('agent', {
-    body: { entryDate, history, mode: 'chat' },
+// Rozmowa z agentem dla danego dnia — odpowiedź STRUMIENIOWA (słowo po słowie).
+// onToken(partial) dostaje narastający tekst odpowiedzi; zwraca pełny tekst na końcu.
+// Bezpośredni fetch (nie invoke), bo invoke buforuje strumień.
+export async function chatWithAgent({ entryDate, history }, onToken) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session?.access_token ?? ''}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ entryDate, history, mode: 'chat' }),
   });
-  if (error) throw new Error(await readFnError(error));
-  if (data?.error) throw new Error(data.error);
-  return data?.reply ?? '';
+  if (!res.ok) {
+    let msg = 'Błąd Logana';
+    try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
+    throw new Error(msg);
+  }
+  if (!res.body) {
+    const text = await res.text();
+    onToken?.(text);
+    return text;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let full = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    full += decoder.decode(value, { stream: true });
+    onToken?.(full);
+  }
+  return full;
 }
 
 // Analiza Logana (na żądanie): pełna, rozbudowana treść + krótki wyciąg (skrót).
@@ -22,19 +49,25 @@ export async function summarizeDay({ entryDate }) {
   return { full: data?.reply ?? '', short: data?.short ?? '' };
 }
 
-// Synteza mowy (xAI TTS, głos leo) — zwraca Blob audio do odtworzenia.
-export async function speak(text) {
-  const { data, error } = await supabase.functions.invoke('tts', { body: { text } });
-  if (error) throw new Error(await readFnError(error));
-  if (data instanceof Blob) {
-    if (data.type.includes('application/json')) {
-      const parsed = JSON.parse(await data.text());
-      throw new Error(parsed.error || 'Błąd syntezy mowy');
-    }
-    return data;
+// Synteza mowy (xAI TTS) — zwraca Blob audio do odtworzenia. Głos: przekazany `voiceId`
+// lub wybrany przez użytkownika (spójny). Bezpośredni fetch, bo invoke parsuje audio/mpeg jako tekst.
+export async function speak(text, voiceId) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tts`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session?.access_token ?? ''}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ text, voice_id: voiceId || getVoice() }),
+  });
+  if (!res.ok) {
+    let msg = 'Błąd syntezy mowy';
+    try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
+    throw new Error(msg);
   }
-  if (data?.error) throw new Error(data.error);
-  throw new Error('Nie otrzymano audio');
+  return await res.blob(); // audio/mpeg
 }
 
 // Transkrypcja nagrania głosowego przez xAI STT.

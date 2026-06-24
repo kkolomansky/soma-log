@@ -43,7 +43,7 @@ export default function LoganExcerpt({ short, onAnalyze }) {
             <LogoMark size={20} thinking className="shrink-0" /> Logan analizuje…
           </div>
         ) : hasShort ? (
-          <p className="text-txt-2 text-[11px] leading-snug line-clamp-4 break-words text-justify">{short}</p>
+          <p className="text-txt-2 text-[11px] leading-snug line-clamp-4 break-words md:text-justify">{short}</p>
         ) : (
           <p className="text-txt-3 text-[11px] leading-snug">
             Kliknij odśwież, aby Logan ocenił ten dzień.

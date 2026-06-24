@@ -7,8 +7,8 @@ import Composer from './Composer';
 export default function InputBar({ draft, onDraftChange, onSend, sending, onOpenChat, hidden = false }) {
   if (hidden) return null;
   return (
-    <div className="shrink-0 bg-bg border-t border-divider px-4 py-3">
-      <div className="max-w-3xl mx-auto" onClick={onOpenChat}>
+    <div className="shrink-0 bg-bg border-t border-divider py-3">
+      <div className="max-w-3xl mx-auto px-3 w-full" onClick={onOpenChat}>
         <Composer
           value={draft}
           onChange={onDraftChange}

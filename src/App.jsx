@@ -11,6 +11,7 @@ import DayView from './components/DayView';
 import InputBar from './components/InputBar';
 import ChatPanel from './components/ChatPanel';
 import AddEntryModal from './components/AddEntryModal';
+import SettingsPanel from './components/SettingsPanel';
 import Auth from './screens/Auth';
 
 const DAYS = buildLast30Days();
@@ -21,6 +22,7 @@ export default function App() {
   const [editFocusKey, setEditFocusKey]  = useState(null);
   const [modulesOpen,  setModulesOpen]   = useState(false);
   const [showChat,     setShowChat]      = useState(false);
+  const [showSettings, setShowSettings]  = useState(false);
   const [draft,        setDraft]         = useState('');
 
   const { session, loading: authLoading, signIn, signUp, signOut } = useAuth();
@@ -86,7 +88,7 @@ export default function App() {
       modulesOpen={modulesOpen}
       onToggleModules={() => setModulesOpen(o => !o)}
       header={
-        <Header onSignOut={signOut} />
+        <Header onSignOut={signOut} onOpenSettings={() => setShowSettings(true)} />
       }
       dayStrip={
         <DayStrip
@@ -139,6 +141,10 @@ export default function App() {
             draft={draft}
             onDraftChange={setDraft}
             onSend={handleSend}
+          />
+          <SettingsPanel
+            open={showSettings}
+            onClose={() => setShowSettings(false)}
           />
         </>
       }

@@ -58,10 +58,12 @@ export default function AiSummaryCard({ summary, onAnalyze }) {
           <ThinkingIndicator label="Logan analizuje dzień…" />
         </div>
       ) : hasSummary ? (
-        <p className="text-txt-2 text-[11px] leading-relaxed whitespace-pre-wrap break-words text-justify">{summary}</p>
+        <div className="max-h-[90px] overflow-y-auto pr-2">
+          <p className="text-txt-2 text-[11px] leading-relaxed whitespace-pre-wrap break-words md:text-justify">{summary}</p>
+        </div>
       ) : (
         <div className="flex flex-col items-center text-center gap-3 py-1">
-          <p className="text-txt-3 text-sm leading-relaxed">
+          <p className="text-txt-3 text-[11px] leading-relaxed">
             Poproś Logana o ocenę stanu z tego dnia i wskazówki, co poprawić.
           </p>
           <button

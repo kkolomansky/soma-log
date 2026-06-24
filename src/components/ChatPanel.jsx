@@ -19,7 +19,7 @@ function Bubble({ role, content }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words text-justify ${
+        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words md:text-justify ${
           isUser
             ? 'bg-recovery/15 text-txt rounded-br-md'
             : 'bg-surface border border-border text-txt-2 rounded-bl-md'
