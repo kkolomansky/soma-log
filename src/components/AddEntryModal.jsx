@@ -150,17 +150,17 @@ export default function AddEntryModal({ open, onClose, onSave, initialEntry = nu
             <div className="bg-surface border border-border rounded-2xl p-4 mb-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="flex items-center gap-1.5 text-txt-3 text-xs font-medium uppercase tracking-wide">
-                  <span className="text-txt-3"><NoteIcon size={14} /></span>
+                  <span className="text-[#0E7490]"><NoteIcon size={14} /></span>
                   Notatka
                 </p>
-                <MicButton onResult={t => setNote(n => (n ? `${n} ${t}` : t))} size={28} iconSize={15} />
+                <MicButton getText={() => note} onText={(joined) => setNote(joined)} size={28} iconSize={15} />
               </div>
               <textarea
                 ref={noteRef}
                 value={note}
                 onChange={e => setNote(e.target.value)}
                 placeholder="Co dzisiaj czujesz? Jak był trening?"
-                className="w-full bg-transparent text-txt placeholder-txt-3 text-[11px] resize-none outline-none leading-relaxed text-justify"
+                className="w-full bg-transparent text-txt placeholder-txt-3 text-[11px] resize-none outline-none leading-relaxed pr-2 md:text-justify"
                 rows={1}
               />
             </div>

@@ -11,9 +11,9 @@ function Spinner({ size = 14 }) {
   );
 }
 
-// Przycisk odczytu na głos (xAI TTS, głos leo „Jarvis"). Współdzielony przez
-// „Podsumowanie Logana" i „Analiza Logana". Odtwarza przekazany `text`.
-export default function SpeakButton({ text, onError, className = '' }) {
+// Przycisk odczytu na głos (xAI TTS). Współdzielony przez „Podsumowanie/Analiza Logana"
+// oraz picker głosu (z `voiceId` do podglądu). Odtwarza przekazany `text`.
+export default function SpeakButton({ text, voiceId, onError, className = '' }) {
   const [state, setState] = useState('idle'); // idle | loading | playing
   const audioRef = useRef(null);
   const hasText = text && text.trim().length > 0;
@@ -31,7 +31,7 @@ export default function SpeakButton({ text, onError, className = '' }) {
     setState('loading');
     onError?.(null);
     try {
-      const blob = await speak(text);
+      const blob = await speak(text, voiceId);
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audioRef.current = audio;

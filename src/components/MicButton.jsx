@@ -1,4 +1,4 @@
-import { useVoiceTranscription } from '../hooks/useVoiceTranscription';
+import { useDictation } from '../hooks/useDictation';
 
 function MicIcon({ size = 16 }) {
   return (
@@ -21,29 +21,38 @@ function Spinner({ size = 16 }) {
   );
 }
 
-// Okrągły przycisk mikrofonu z transkrypcją głosową (xAI STT).
-// onResult(text) → np. dopisanie tekstu do notatki/pola.
-export default function MicButton({ onResult, size = 32, iconSize = 16, className = '' }) {
-  const { recording, transcribing, error, toggle } = useVoiceTranscription(onResult);
-  const busy = transcribing;
+// Przycisk dyktowania „przytrzymaj i mów" — transkrypcja na żywo (Web Speech API).
+// getText() → bieżąca treść pola (baza); onText(joined, isFinal) → aktualizacja pola.
+export default function MicButton({ getText, onText, size = 32, iconSize = 16, className = '' }) {
+  const { listening, transcribing, error, start, stop } = useDictation({ getText, onText });
+
+  const onPointerDown = (e) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    start();
+  };
+  const onPointerUp = () => stop();
 
   return (
     <button
       type="button"
-      onClick={toggle}
-      disabled={busy}
-      title={error || (recording ? 'Zatrzymaj nagrywanie' : 'Dyktuj notatkę głosem')}
-      aria-label={recording ? 'Zatrzymaj nagrywanie' : 'Dyktuj głosem'}
-      style={{ width: size, height: size }}
-      className={`rounded-full flex items-center justify-center shrink-0 transition-colors ${
-        recording
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerUp}
+      onPointerCancel={onPointerUp}
+      disabled={transcribing}
+      title={error || (listening ? 'Puść, aby zakończyć' : 'Przytrzymaj i mów')}
+      aria-label="Dyktuj głosem (przytrzymaj)"
+      style={{ width: size, height: size, touchAction: 'none' }}
+      className={`rounded-full flex items-center justify-center shrink-0 transition-colors select-none ${
+        listening
           ? 'bg-danger/20 text-danger animate-pulse'
           : error
           ? 'bg-elevated text-danger'
           : 'bg-elevated text-txt-3 hover:text-txt'
       } disabled:opacity-60 ${className}`}
     >
-      {busy ? <Spinner size={iconSize} /> : <MicIcon size={iconSize} />}
+      {transcribing ? <Spinner size={iconSize} /> : <MicIcon size={iconSize} />}
     </button>
   );
 }
