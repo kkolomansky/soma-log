@@ -1,115 +1,21 @@
 // Agent AI SomaLog (Logan) — trener z zapleczem lekarskim/osteopatycznym.
 // Tryb chat: odpowiedź STRUMIENIOWA (słowo po słowie, SSE od xAI → text/plain do klienta).
 // Tryb summary: JSON { reply, short }. Otwarty dzień w kontekście; pozostałe dni przez get_entries.
+// Persona, metryki, narzędzie get_entries i wywołanie xAI są współdzielone z funkcją `api`.
 import { createClient } from "jsr:@supabase/supabase-js@2";
-
-const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
-const XAI_URL = "https://api.x.ai/v1/chat/completions";
-const MODEL = "grok-4-1-fast-reasoning";
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const json = (body, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS, "Content-Type": "application/json" },
-  });
-
-const METRICS = [
-  { key: "sleep", label: "Sen", higherBetter: true },
-  { key: "energy", label: "Energia", higherBetter: true },
-  { key: "motivation", label: "Motywacja", higherBetter: true },
-  { key: "fatigue", label: "Zmęczenie", higherBetter: false },
-  { key: "doms", label: "Bolesność mięśni (DOMS)", higherBetter: false },
-  { key: "stress", label: "Stres", higherBetter: false },
-];
-
-function formatEntry(e) {
-  if (!e) return "Brak wpisu na ten dzień (parametry nieuzupełnione).";
-  const lines = METRICS.map((m) => {
-    const v = e[m.key];
-    const dir = m.higherBetter ? "wyżej = lepiej" : "niżej = lepiej";
-    return `- ${m.label}: ${v ?? "—"}/100 (${dir})`;
-  });
-  const note =
-    typeof e.note === "string" && e.note.trim()
-      ? `\nNotatka użytkownika: „${e.note.trim()}"`
-      : "\nNotatka: (brak)";
-  return lines.join("\n") + note;
-}
-
-const PERSONA = `Nazywasz się Logan — jesteś ekspertem od regeneracji i wydolności w aplikacji SomaLog. Łączysz kompetencje trenera personalnego najwyższej klasy z wiedzą z zakresu medycyny sportowej, fizjologii wysiłku i osteopatii. Mówisz po polsku, rzeczowo, ciepło i konkretnie. Twoje zadanie: na podstawie dziennych parametrów (sen, energia, motywacja, zmęczenie, bolesność DOMS, stres; skala 0–100) oraz subiektywnych notatek oceniać stan użytkownika, wykrywać ryzyko przetrenowania, oceniać jakość regeneracji i podpowiadać konkretne działania poprawiające poszczególne parametry.
-
-Zasady:
-- Pamiętaj o kierunku skali: dla snu/energii/motywacji wyższa wartość jest lepsza; dla zmęczenia/bolesności/stresu niższa jest lepsza.
-- Gdy potrzebujesz porównać dni lub wychwycić trend (np. narastające zmęczenie, spadek snu), użyj narzędzia get_entries, aby pobrać wcześniejsze wpisy. Nie zgaduj historii — sprawdź ją.
-- Łącz sygnały: utrzymujące się wysokie zmęczenie/DOMS/stres przy spadku snu i motywacji to czerwone flagi przetrenowania; dobre wartości i stabilny trend → można utrzymać obciążenie.
-- Dawaj 1–3 konkretne, wykonalne wskazówki, nie ogólniki.
-- Jesteś wsparciem treningowym, nie stawiasz diagnoz medycznych. Przy niepokojących objawach zalecaj kontakt ze specjalistą.`;
+import {
+  CORS,
+  json,
+  formatEntry,
+  PERSONA,
+  XAI_API_KEY,
+  runGetEntries,
+  callXai,
+} from "../_shared/logan.ts";
 
 const SUMMARY_INSTRUCTION = `Tryb: ANALIZA LOGANA (rozbudowane podsumowanie dnia). Przygotuj wnikliwą, rozbudowaną analizę stanu użytkownika na podstawie parametrów tego dnia, notatki ORAZ — jeśli została dołączona — rozmowy z tego dnia. Wykorzystaj narzędzie get_entries, aby porównać kilka ostatnich dni i ocenić trend (regeneracja vs narastające zmęczenie/ryzyko przetrenowania). Struktura: 3–5 akapitów — (1) ogólna ocena stanu i regeneracji, (2) interpretacja poszczególnych parametrów i ich zmian w czasie, (3) ryzyka (np. przetrenowanie) i sygnały ostrzegawcze, (4) konkretne, wykonalne zalecenia na najbliższe dni. Pisz po polsku, pełnymi zdaniami, bez nagłówków markdown.
 
 WAŻNE — format odpowiedzi: pierwsza linia to dokładnie "SKRÓT: " + jedno zwięzłe zdanie (max ~140 znaków) podsumowujące najważniejszy wniosek; potem pusta linia; potem pełna, rozbudowana analiza.`;
-
-const TOOLS = [
-  {
-    type: "function",
-    function: {
-      name: "get_entries",
-      description:
-        "Pobiera wcześniejsze wpisy użytkownika (parametry 0–100 i notatki) z zakresu dat, aby ocenić trendy i regenerację.",
-      parameters: {
-        type: "object",
-        properties: {
-          from: { type: "string", description: "Data początkowa YYYY-MM-DD (włącznie)" },
-          to: { type: "string", description: "Data końcowa YYYY-MM-DD (włącznie)" },
-        },
-        required: ["from", "to"],
-      },
-    },
-  },
-];
-
-// Wykonanie narzędzia get_entries pod RLS użytkownika.
-async function runGetEntries(supabase, argsRaw) {
-  try {
-    const args = JSON.parse(argsRaw || "{}");
-    const { data: rows, error } = await supabase
-      .from("soma_entries")
-      .select("entry_date, sleep, energy, motivation, fatigue, doms, stress, note")
-      .gte("entry_date", args.from)
-      .lte("entry_date", args.to)
-      .order("entry_date", { ascending: true });
-    return error ? { error: error.message } : { entries: rows };
-  } catch (e) {
-    return { error: String(e) };
-  }
-}
-
-function callXai(messages, stream, maxTokens) {
-  return fetch(XAI_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${XAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      tools: TOOLS,
-      tool_choice: "auto",
-      temperature: 0.4,
-      stream: !!stream,
-      // Budżet na pełną analizę — model reasoning bez limitu potrafi zwrócić pustą treść.
-      ...(maxTokens ? { max_tokens: maxTokens } : {}),
-    }),
-  });
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });

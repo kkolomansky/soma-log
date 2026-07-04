@@ -14,10 +14,13 @@ import ChatPanel from './components/ChatPanel';
 import AddEntryModal from './components/AddEntryModal';
 import SettingsPanel from './components/SettingsPanel';
 import Auth from './screens/Auth';
+import Docs from './screens/Docs';
+import { useRoute } from './lib/nav';
 
 const DAYS = buildLast30Days();
 
 export default function App() {
+  const path = useRoute();
   const [selectedDate, setSelectedDate] = useState(() => toDateString(new Date()));
   const [showAddModal, setShowAddModal]  = useState(false);
   const [editFocusKey, setEditFocusKey]  = useState(null);
@@ -36,6 +39,9 @@ export default function App() {
 
   // Po zalogowaniu wczytaj zapisany na koncie głos Logana do lokalnego cache (trwałość między sesjami).
   useEffect(() => { if (userId) loadVoiceFromServer(); }, [userId]);
+
+  // Publiczna dokumentacja API — dostępna pod /docs niezależnie od logowania.
+  if (path.startsWith('/docs')) return <Docs />;
 
   if (authLoading) {
     return (

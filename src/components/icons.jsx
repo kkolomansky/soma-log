@@ -194,3 +194,25 @@ export function NoteIcon(props) {
     </Svg>
   );
 }
+
+// Token / API — klucz
+export function KeyIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="M10.7 12.3 21 2" />
+      <path d="M17 6l3 3" />
+      <path d="M15 8l2 2" />
+    </Svg>
+  );
+}
+
+// Dokumentacja — otwarta książka
+export function DocsIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 6.5C10.5 5 8.5 4.5 4 5v13c4.5-.5 6.5 0 8 1.5" />
+      <path d="M12 6.5C13.5 5 15.5 4.5 20 5v13c-4.5-.5-6.5 0-8 1.5" />
+    </Svg>
+  );
+}

@@ -1,0 +1,20 @@
+# Konfiguracja Edge Functions SomaLog.
+# `api` używa własnego schematu autoryzacji (osobisty token API, nie JWT), więc bramka
+# nie może wymuszać weryfikacji JWT — walidację tokenu robi sama funkcja (service-role).
+# Jeśli wdrażasz przez panel Supabase zamiast CLI, ustaw ten sam „Verify JWT: off"
+# dla funkcji `api` w Dashboard → Edge Functions → api → Settings.
+[functions.api]
+verify_jwt = false
+
+# Pozostałe funkcje wymagają zalogowanego użytkownika (domyślne verify_jwt = true).
+[functions.agent]
+verify_jwt = true
+
+[functions.tokens]
+verify_jwt = true
+
+[functions.transcribe]
+verify_jwt = true
+
+[functions.tts]
+verify_jwt = true
