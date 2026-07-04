@@ -40,8 +40,8 @@ export default function App() {
   // Po zalogowaniu wczytaj zapisany na koncie głos Logana do lokalnego cache (trwałość między sesjami).
   useEffect(() => { if (userId) loadVoiceFromServer(); }, [userId]);
 
-  // Publiczna dokumentacja API — dostępna pod /docs niezależnie od logowania.
-  if (path.startsWith('/docs')) return <Docs />;
+  // Publiczna dokumentacja (API + MCP) — dostępna pod /docs niezależnie od logowania.
+  if (path.startsWith('/docs')) return <Docs session={session} />;
 
   if (authLoading) {
     return (
