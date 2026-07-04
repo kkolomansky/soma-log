@@ -19,7 +19,7 @@ function Bubble({ role, content }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words md:text-justify ${
+        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[12px] leading-relaxed whitespace-pre-wrap break-words md:text-justify ${
           isUser
             ? 'bg-recovery/15 text-txt rounded-br-md'
             : 'bg-surface border border-border text-txt-2 rounded-bl-md'
@@ -65,8 +65,8 @@ export default function ChatPanel({
         <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-divider">
           <LogoMark size={28} className="shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-txt font-display font-semibold text-sm leading-tight">Logan</p>
-            <p className="text-txt-3 text-xs leading-tight capitalize truncate">{formatFullDate(dateStr)}</p>
+            <p className="text-txt font-display font-semibold text-[12px] leading-tight">Logan</p>
+            <p className="text-txt-3 text-[10px] leading-tight capitalize truncate">{formatFullDate(dateStr)}</p>
           </div>
           <button
             onClick={onClose}
@@ -82,8 +82,8 @@ export default function ChatPanel({
           {messages.length === 0 && !sending && (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-8">
               <LogoMark size={44} />
-              <p className="text-txt-2 text-sm font-medium">Porozmawiaj o tym dniu</p>
-              <p className="text-txt-3 text-xs leading-relaxed max-w-xs">
+              <p className="text-txt-2 text-[12px] font-medium">Porozmawiaj o tym dniu</p>
+              <p className="text-txt-3 text-[10px] leading-relaxed max-w-xs">
                 Logan widzi Twoje dzisiejsze parametry i notatkę. Zapytaj o stan,
                 regenerację albo o to, co poprawić.
               </p>
@@ -97,7 +97,7 @@ export default function ChatPanel({
           {sending && (
             <div className="flex justify-start">
               <div className="bg-surface border border-border rounded-2xl rounded-bl-md px-3.5 py-2.5">
-                <ThinkingIndicator label="Trener analizuje…" />
+                <ThinkingIndicator label="Trener analizuje…" textClass="text-[12px]" />
               </div>
             </div>
           )}

@@ -98,10 +98,8 @@ export function useEntries(userId) {
       .select()
       .single();
 
-    if (error) {
-      setError(error.message);
-      return null;
-    }
+    // Błąd zapisu nie może być cichy — rzuć, aby karta analizy pokazała komunikat.
+    if (error) throw new Error(error.message);
 
     const saved = fromRow(data);
     setEntries(prev => prev.map(e => (e.entryDate === saved.entryDate ? saved : e)));

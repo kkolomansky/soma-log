@@ -10,7 +10,7 @@ export default function AppLayout({ header, dayStrip, dayView, inputBar, modals,
       <div className="flex-1 flex flex-col min-w-0">
         {header}
         {dayStrip}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
           {dayView}
         </div>
         {inputBar}

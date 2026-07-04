@@ -76,7 +76,7 @@ export default function Composer({
           onFocus={onActivate}
           rows={1}
           placeholder={placeholder}
-          className="flex-1 self-center bg-transparent text-txt placeholder-txt-3 text-[13px] outline-none resize-none leading-relaxed py-1 max-h-40"
+          className="flex-1 self-center bg-transparent text-txt placeholder-txt-3 text-[11px] outline-none resize-none leading-relaxed py-1 max-h-40"
         />
         <button
           type="button"
@@ -107,7 +107,7 @@ export default function Composer({
           <SendIcon size={16} />
         </button>
       </div>
-      {micError && <p className="text-danger text-xs mt-1 px-1">{micError}</p>}
+      {micError && <p className="text-danger text-[10px] mt-1 px-1">{micError}</p>}
     </div>
   );
 }

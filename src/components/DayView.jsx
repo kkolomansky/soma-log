@@ -238,7 +238,7 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
                 Web (md+): obie połówki po równo, większy zegar. */}
             <div className="flex items-stretch gap-3 mb-6">
               <div className="flex flex-col items-center justify-center gap-1.5 shrink-0 w-[108px] md:w-auto md:flex-1">
-                <CircularGauge value={score} max={100} color={label.color} size={isWide ? 156 : 108} strokeWidth={isWide ? 12 : 9} />
+                <CircularGauge value={score} max={100} color={label.color} size={isWide ? 156 : 108} strokeWidth={isWide ? 9 : 7} />
                 <p className="text-sm md:text-base font-display font-bold text-center leading-tight" style={{ color: label.color }}>
                   {label.text}
                 </p>
@@ -257,7 +257,7 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
                   aria-label={`Edytuj: ${m.label}`}
                   className="flex flex-col items-center gap-1.5 rounded-xl py-2 hover:bg-elevated transition-colors"
                 >
-                  <CircularGauge value={entry[m.key]} max={100} color={m.color} size={64} strokeWidth={6} />
+                  <CircularGauge value={entry[m.key]} max={100} color={m.color} size={64} strokeWidth={4.5} />
                   <span className="flex items-center gap-1 min-w-0">
                     <span style={{ color: m.color }}><m.Icon size={14} /></span>
                     <span className="text-txt-2 text-xs font-medium leading-tight truncate">{m.label}</span>

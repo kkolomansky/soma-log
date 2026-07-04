@@ -46,7 +46,10 @@ export async function summarizeDay({ entryDate }) {
   });
   if (error) throw new Error(await readFnError(error));
   if (data?.error) throw new Error(data.error);
-  return { full: data?.reply ?? '', short: data?.short ?? '' };
+  const full = data?.reply ?? '';
+  // Pusta treść z modelu = nie zapisuj „pustej" analizy jako sukces — pokaż błąd, pozwól ponowić.
+  if (!full.trim()) throw new Error('Logan nie zwrócił analizy. Spróbuj ponownie.');
+  return { full, short: data?.short ?? '' };
 }
 
 // Synteza mowy (xAI TTS) — zwraca Blob audio do odtworzenia. Głos: przekazany `voiceId`
