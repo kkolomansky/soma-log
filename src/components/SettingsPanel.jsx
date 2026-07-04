@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import SpeakButton from './SpeakButton';
-import { UserIcon, SpeakerIcon } from './icons';
+import { UserIcon, SpeakerIcon, KeyIcon } from './icons';
 import { VOICES, SAMPLE_TEXT, getVoice, setVoice, saveVoiceToServer } from '../lib/voice';
+import { listTokens, createToken, revokeToken, API_BASE } from '../lib/apiTokens';
 
 function CloseIcon({ size = 18 }) {
   return (
@@ -84,10 +85,117 @@ function VoicePicker() {
   );
 }
 
-// Lista pozycji menu panelu. Na razie jedna (głos Logana); gotowa na kolejne w przyszłości.
-function SettingsMenu({ onOpenVoice }) {
+function fmtDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleDateString('pl-PL'); } catch { return '—'; }
+}
+
+// Zarządzanie osobistymi tokenami API. Plaintext pokazywany raz — z przyciskiem „Kopiuj".
+function TokensPanel() {
+  const [tokens, setTokens] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [fresh, setFresh] = useState(null); // świeżo utworzony token (plaintext)
+  const [copied, setCopied] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setTokens(await listTokens()); setError(null); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const generate = async () => {
+    if (busy) return;
+    setBusy(true); setError(null); setFresh(null); setCopied(false);
+    try {
+      const created = await createToken(null);
+      setFresh(created.token);
+      await load();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(fresh); setCopied(true); setTimeout(() => setCopied(false), 1500); }
+    catch { /* brak uprawnień do schowka */ }
+  };
+
+  const revoke = async (id) => {
+    setBusy(true); setError(null);
+    try { await revokeToken(id); await load(); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <p className="text-txt-3 text-[11px] leading-relaxed mb-3">
+        Tokeny pozwalają sterować SomaLog spoza aplikacji (skrypty, automatyzacje). Wysyłaj je w nagłówku
+        <span className="text-txt-2"> Authorization: Bearer &lt;token&gt;</span> na <span className="text-txt-2 break-all">{API_BASE}</span>.
+      </p>
+
+      <button
+        onClick={generate}
+        disabled={busy}
+        className="w-full mb-3 rounded-xl bg-recovery/90 hover:bg-recovery text-bg text-sm font-medium py-2.5 transition-colors disabled:opacity-50"
+      >
+        {busy ? 'Pracuję…' : 'Generuj nowy token'}
+      </button>
+
+      {fresh && (
+        <div className="mb-3 rounded-xl border border-recovery/50 bg-recovery/10 p-3">
+          <p className="text-txt-2 text-[11px] leading-relaxed mb-2">
+            Skopiuj token teraz — <span className="text-txt font-medium">nie zobaczysz go ponownie</span>.
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 min-w-0 text-txt text-[11px] bg-surface rounded-lg px-2 py-1.5 break-all">{fresh}</code>
+            <button onClick={copy} className="shrink-0 rounded-lg border border-border-strong px-2.5 py-1.5 text-xs text-txt-2 hover:text-txt hover:bg-surface transition-colors">
+              {copied ? 'Skopiowano' : 'Kopiuj'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-danger text-[11px] mb-2">{error}</p>}
+
+      {loading ? (
+        <p className="text-txt-3 text-[11px]">Ładowanie…</p>
+      ) : tokens.length === 0 ? (
+        <p className="text-txt-3 text-[11px]">Brak tokenów. Wygeneruj pierwszy powyżej.</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {tokens.map((t) => (
+            <div key={t.id} className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
+              <span className="min-w-0 flex-1">
+                <span className="block text-txt text-[13px] font-medium leading-tight truncate">{t.token_prefix}…</span>
+                <span className="block text-txt-3 text-[11px] leading-tight truncate">
+                  utworzono {fmtDate(t.created_at)}{t.last_used_at ? ` · użyto ${fmtDate(t.last_used_at)}` : ' · nieużywany'}
+                </span>
+              </span>
+              <button
+                onClick={() => revoke(t.id)}
+                disabled={busy}
+                className="shrink-0 rounded-lg border border-border-strong px-2.5 py-1.5 text-xs text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
+              >
+                Odwołaj
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// Lista pozycji menu panelu.
+function SettingsMenu({ onOpenVoice, onOpenTokens }) {
   const items = [
     { id: 'voice', label: 'Głos Logana', desc: 'Wybór lektora odczytu analizy', Icon: SpeakerIcon, onClick: onOpenVoice },
+    { id: 'tokens', label: 'Tokeny API', desc: 'Sterowanie aplikacją spoza SomaLog', Icon: KeyIcon, onClick: onOpenTokens },
   ];
   return (
     <div className="flex flex-col gap-1.5">
@@ -113,10 +221,13 @@ function SettingsMenu({ onOpenVoice }) {
 
 // Panel użytkownika — menu ustawień. Pozycje (na razie „Głos Logana") wchodzą w podwidoki.
 export default function SettingsPanel({ open, onClose }) {
-  const [view, setView] = useState('menu'); // 'menu' | 'voice'
+  const [view, setView] = useState('menu'); // 'menu' | 'voice' | 'tokens'
   useEffect(() => { if (open) setView('menu'); }, [open]);
 
   const inVoice = view === 'voice';
+  const inTokens = view === 'tokens';
+  const inSub = inVoice || inTokens;
+  const title = inVoice ? 'Głos Logana' : inTokens ? 'Tokeny API' : 'Panel użytkownika';
 
   return (
     <>
@@ -134,7 +245,7 @@ export default function SettingsPanel({ open, onClose }) {
         >
           <div className="flex items-center justify-between mb-4">
             <p className="flex items-center gap-2 text-txt font-display font-semibold text-base">
-              {inVoice ? (
+              {inSub ? (
                 <button
                   onClick={() => setView('menu')}
                   aria-label="Wstecz"
@@ -145,7 +256,7 @@ export default function SettingsPanel({ open, onClose }) {
               ) : (
                 <span className="text-txt-3"><UserIcon size={18} /></span>
               )}
-              {inVoice ? 'Głos Logana' : 'Panel użytkownika'}
+              {title}
             </p>
             <button
               onClick={onClose}
@@ -156,7 +267,9 @@ export default function SettingsPanel({ open, onClose }) {
             </button>
           </div>
 
-          {inVoice ? <VoicePicker /> : <SettingsMenu onOpenVoice={() => setView('voice')} />}
+          {inVoice ? <VoicePicker />
+            : inTokens ? <TokensPanel />
+            : <SettingsMenu onOpenVoice={() => setView('voice')} onOpenTokens={() => setView('tokens')} />}
         </div>
       </div>
     </>

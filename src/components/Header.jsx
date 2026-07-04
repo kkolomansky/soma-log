@@ -1,5 +1,6 @@
 import { LogoFull } from './Logo';
-import { LogoutIcon, UserIcon } from './icons';
+import { LogoutIcon, UserIcon, DocsIcon } from './icons';
+import { navigate } from '../lib/nav';
 
 export default function Header({ onSignOut, onOpenSettings }) {
   const iconBtn = 'w-9 h-9 rounded-full flex items-center justify-center text-txt-3 hover:text-txt hover:bg-surface transition-colors';
@@ -15,6 +16,15 @@ export default function Header({ onSignOut, onOpenSettings }) {
           className={iconBtn}
         >
           <UserIcon size={20} />
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/docs')}
+          title="Dokumentacja API"
+          aria-label="Dokumentacja API"
+          className={iconBtn}
+        >
+          <DocsIcon size={20} />
         </button>
         <button
           onClick={onSignOut}
