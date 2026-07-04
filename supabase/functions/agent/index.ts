@@ -91,7 +91,7 @@ async function runGetEntries(supabase, argsRaw) {
   }
 }
 
-function callXai(messages, stream) {
+function callXai(messages, stream, maxTokens) {
   return fetch(XAI_URL, {
     method: "POST",
     headers: {
@@ -105,6 +105,8 @@ function callXai(messages, stream) {
       tool_choice: "auto",
       temperature: 0.4,
       stream: !!stream,
+      // Budżet na pełną analizę — model reasoning bez limitu potrafi zwrócić pustą treść.
+      ...(maxTokens ? { max_tokens: maxTokens } : {}),
     }),
   });
 }
@@ -168,17 +170,19 @@ Deno.serve(async (req) => {
 
     // Pętla nie-strumieniowa → JSON { reply, short }.
     for (let i = 0; i < 5; i++) {
-      const res = await callXai(messages, false);
+      const res = await callXai(messages, false, 2000);
       if (!res.ok) return json({ error: `Błąd xAI: ${res.status} ${await res.text()}` }, 502);
       const data = await res.json();
       const msg = data.choices?.[0]?.message;
       if (!msg) return json({ error: "Pusta odpowiedź modelu" }, 502);
       const toolCalls = msg.tool_calls;
       if (!toolCalls || toolCalls.length === 0) {
-        const content = msg.content ?? "";
+        const content = (msg.content ?? "").trim();
+        // Brak treści (np. model zużył budżet na reasoning) — zgłoś błąd zamiast cichego pustego sukcesu.
+        if (!content) return json({ error: "Logan nie zwrócił analizy. Spróbuj ponownie." }, 502);
         const m = content.match(/^\s*SKR[ÓO]T:\s*(.+?)\s*(?:\n|$)/i);
         const short = m ? m[1].trim() : content.split(/\n/)[0].slice(0, 160).trim();
-        const full = m ? content.slice(m[0].length).trim() : content.trim();
+        const full = m ? content.slice(m[0].length).trim() : content;
         return json({ reply: full || content, short });
       }
       messages.push(msg);

@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth';
 import { useEntries } from './hooks/useEntries';
 import { useChat } from './hooks/useChat';
 import { summarizeDay } from './lib/agent';
+import { loadVoiceFromServer } from './lib/voice';
 import { toDateString, buildLast30Days } from './utils/dateUtils';
 import AppLayout from './layouts/AppLayout';
 import Header from './components/Header';
@@ -32,6 +33,9 @@ export default function App() {
 
   // Zmiana dnia → czysty composer i zamknięta rozmowa (wątek ładuje się dla nowego dnia).
   useEffect(() => { setDraft(''); setShowChat(false); }, [selectedDate]);
+
+  // Po zalogowaniu wczytaj zapisany na koncie głos Logana do lokalnego cache (trwałość między sesjami).
+  useEffect(() => { if (userId) loadVoiceFromServer(); }, [userId]);
 
   if (authLoading) {
     return (
