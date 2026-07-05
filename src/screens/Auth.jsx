@@ -46,16 +46,11 @@ export default function Auth({ onSignIn, onSignUp }) {
 
   return (
     <div className="px-4 pt-14 pb-4">
-      <div className="mb-8 flex flex-col items-center text-center">
+      <div className="mb-5 flex flex-col items-center text-center">
         <LogoFull size={44} withTagline centered className="mb-12" />
         <h1 className="text-xl font-display font-bold text-txt tracking-tight">
           {isSignup ? 'Załóż konto' : 'Zaloguj się'}
         </h1>
-        <p className="text-txt-3 text-sm mt-1">
-          {isSignup
-            ? 'Utwórz konto, aby zapisywać swoje wpisy'
-            : 'Twoje wpisy są widoczne tylko dla Ciebie'}
-        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-surface border border-border rounded-2xl p-5 flex flex-col gap-4">
