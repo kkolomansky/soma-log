@@ -7,6 +7,9 @@ export const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
 export const XAI_URL = "https://api.x.ai/v1/chat/completions";
 export const MODEL = "grok-4-1-fast-reasoning";
 
+// Dzienny limit zapytań do Logana per użytkownik (wspólny dla /ask, MCP i webowego czatu/analizy).
+export const LOGAN_DAILY_LIMIT = Number(Deno.env.get("LOGAN_DAILY_LIMIT") ?? "100");
+
 export const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -92,6 +95,41 @@ export async function runGetEntries(
   } catch (e) {
     return { error: String(e) };
   }
+}
+
+// Egzekwuje dzienny limit zapytań do Logana. Zwraca null gdy w limicie, albo gotową odpowiedź 429.
+// `userId` podaj przy kliencie service-role (funkcja `api`); przy kliencie JWT (funkcja `agent`)
+// pomiń — RPC odczyta auth.uid(). Fail-open: przy błędzie licznika nie blokujemy zapytania.
+export async function enforceRateLimit(
+  client: SupabaseClient,
+  userId?: string,
+): Promise<Response | null> {
+  const { data, error } = await client.rpc("soma_ai_rate_limit", {
+    p_limit: LOGAN_DAILY_LIMIT,
+    p_user_id: userId ?? null,
+  });
+  if (error || !data || data.allowed) return null;
+
+  const resetAt = data.reset_at as string | undefined;
+  const retryAfter = resetAt
+    ? Math.max(1, Math.ceil((new Date(resetAt).getTime() - Date.now()) / 1000))
+    : undefined;
+  return new Response(
+    JSON.stringify({
+      error: `Przekroczono dzienny limit zapytań do Logana (${data.limit}/dzień). Spróbuj ponownie jutro.`,
+      limit: data.limit,
+      count: data.count,
+      resetAt: resetAt ?? null,
+    }),
+    {
+      status: 429,
+      headers: {
+        ...CORS,
+        "Content-Type": "application/json",
+        ...(retryAfter ? { "Retry-After": String(retryAfter) } : {}),
+      },
+    },
+  );
 }
 
 export function callXai(messages: unknown[], stream: boolean, maxTokens?: number) {

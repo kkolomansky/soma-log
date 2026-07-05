@@ -61,6 +61,7 @@ export default function DocsApi() {
                   { name: '400', type: 'Bad Request', desc: 'Nieprawidłowe dane (np. parametr spoza zakresu 0–100 lub zła data).', required: false },
                   { name: '401', type: 'Unauthorized', desc: 'Brak, nieprawidłowy lub odwołany token.', required: false },
                   { name: '404', type: 'Not Found', desc: 'Nieznana ścieżka (użyj /entries lub /ask).', required: false },
+                  { name: '429', type: 'Too Many Requests', desc: 'Przekroczono dzienny limit zapytań do Logana (100/dzień, per użytkownik). Reset o północy (Europe/Warsaw).', required: false },
                   { name: '502', type: 'Bad Gateway', desc: 'Błąd usługi AI przy zapytaniu do Logana.', required: false },
                 ]}
               />
@@ -123,6 +124,13 @@ export default function DocsApi() {
             rozmowy w aplikacji. Opcjonalne pole <code className="font-mono text-txt">date</code> wskazuje dzień, którego wpis
             zostanie użyty jako kontekst (domyślnie dziś). Logan może też sięgnąć po wcześniejsze wpisy, by ocenić trend.
           </p>
+          <p>
+            <span className="text-txt">Limit zapytań:</span> zapytania do Logana są objęte dziennym limitem
+            {' '}<span className="text-txt">100 zapytań na dobę per konto</span> (wspólnym dla tego endpointu,
+            narzędzia MCP <code className="font-mono text-txt">ask_logan</code> oraz czatu w aplikacji). Po przekroczeniu
+            endpoint zwraca <code className="font-mono text-txt">429 Too Many Requests</code> z nagłówkiem
+            {' '}<code className="font-mono text-txt">Retry-After</code>; licznik zeruje się o północy (Europe/Warsaw).
+          </p>
           <div>
             <SubHeading>Body (JSON)</SubHeading>
             <div className="mt-2">
@@ -147,6 +155,12 @@ export default function DocsApi() {
             <SubHeading>Odpowiedź 200</SubHeading>
             <div className="mt-2">
               <CodeBlock code={`{\n  "answer": "Regeneracja jest słaba — niski sen i wysokie DOMS…",\n  "entryDate": "2026-07-05"\n}`} />
+            </div>
+          </div>
+          <div>
+            <SubHeading>Odpowiedź 429 (limit)</SubHeading>
+            <div className="mt-2">
+              <CodeBlock code={`{\n  "error": "Przekroczono dzienny limit zapytań do Logana (100/dzień). Spróbuj ponownie jutro.",\n  "limit": 100,\n  "count": 100,\n  "resetAt": "2026-07-06T00:00:00+02:00"\n}`} />
             </div>
           </div>
         </Endpoint>
