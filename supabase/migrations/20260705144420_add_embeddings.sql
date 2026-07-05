@@ -41,6 +41,4 @@ $$;
 grant execute on function public.match_soma_entries(extensions.vector(1536), int, uuid)
   to authenticated, service_role;
 
--- Indeks HNSW (cosine) do szybkiego wyszukiwania najbliższych sąsiadów po embeddingu.
-create index if not exists soma_entries_embedding_idx
-  on public.soma_entries using hnsw (embedding vector_cosine_ops);
+-- Indeks HNSW (cosine) tworzony w osobnej migracji po dodaniu kolumny (add_embeddings_hnsw_index).

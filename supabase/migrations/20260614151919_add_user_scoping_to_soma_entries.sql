@@ -1,0 +1,4 @@
+-- Migracja historyczna (aplikowana pierwotnie przez dashboard). Jej efekt — kolumna user_id,
+-- klucz obcy do auth.users, RLS i polityki per-użytkownik — jest w pełni odwzorowany w skonsolidowanej
+-- migracji bazowej `create_soma_entries_table`. Plik istnieje, by wersja zgadzała się z historią
+-- migracji produkcji (Supabase Branching wymaga pliku dla każdej zdalnej wersji). Świadomy no-op.

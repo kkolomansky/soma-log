@@ -1,0 +1,4 @@
+-- Migracja historyczna (aplikowana pierwotnie przez dashboard). Skala 0–100 dla metryk jest
+-- odwzorowana w skonsolidowanej migracji bazowej `create_soma_entries_table` (CHECK 0–100). Plik
+-- istnieje, by wersja zgadzała się z historią migracji produkcji (Supabase Branching wymaga pliku
+-- dla każdej zdalnej wersji). Świadomy no-op.

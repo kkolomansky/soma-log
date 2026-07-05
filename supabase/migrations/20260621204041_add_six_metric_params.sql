@@ -1,0 +1,4 @@
+-- Migracja historyczna (aplikowana pierwotnie przez dashboard). Docelowe 6 metryk (sleep, energy,
+-- motivation, fatigue, doms, stress) jest odwzorowane w skonsolidowanej migracji bazowej
+-- `create_soma_entries_table`. Plik istnieje, by wersja zgadzała się z historią migracji produkcji
+-- (Supabase Branching wymaga pliku dla każdej zdalnej wersji). Świadomy no-op.
