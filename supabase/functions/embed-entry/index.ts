@@ -2,7 +2,9 @@
 // (note + 6 metryk). Liczy embedding OpenAI z kanonicznego kompozytu i zapisuje go do kolumny
 // `embedding`. Aktualizujemy TYLKO tę kolumnę — trigger nasłuchuje kolumn treści, więc nie ma pętli.
 //
-// verify_jwt=false (wołane z bazy, nie przez JWT). Autoryzacja: nagłówek x-embed-secret == EMBED_WEBHOOK_SECRET.
+// verify_jwt=false (wołane z bazy, nie przez JWT). Autoryzacja: nagłówek x-embed-secret jest
+// weryfikowany przez RPC public.verify_embed_secret (porównuje z sekretem z Vault w bazie) —
+// dzięki temu nie trzeba ustawiać sekretu po stronie funkcji, cała konfiguracja żyje w Vault.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   CORS,
@@ -11,8 +13,6 @@ import {
   embedText,
   OPENAI_API_KEY,
 } from "../_shared/logan.ts";
-
-const EMBED_WEBHOOK_SECRET = Deno.env.get("EMBED_WEBHOOK_SECRET");
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -27,8 +27,11 @@ Deno.serve(async (req) => {
   if (!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
     return json({ error: "Brak konfiguracji SUPABASE_SERVICE_ROLE_KEY" }, 500);
   }
-  // Sekret współdzielony z triggerem — odcina publiczne wywołania (funkcja ma verify_jwt=false).
-  if (!EMBED_WEBHOOK_SECRET || req.headers.get("x-embed-secret") !== EMBED_WEBHOOK_SECRET) {
+  // Sekret współdzielony z triggerem (z Vault) — odcina publiczne wywołania (verify_jwt=false).
+  // Weryfikacja po stronie bazy: RPC porównuje nagłówek z sekretem, nie zwracając go na zewnątrz.
+  const { data: authorized, error: authErr } =
+    await admin.rpc("verify_embed_secret", { candidate: req.headers.get("x-embed-secret") ?? "" });
+  if (authErr || authorized !== true) {
     return json({ error: "Nieautoryzowane" }, 401);
   }
 
