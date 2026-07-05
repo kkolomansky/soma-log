@@ -8,7 +8,7 @@ export const XAI_URL = "https://api.x.ai/v1/chat/completions";
 export const MODEL = "grok-4-1-fast-reasoning";
 
 // Dzienny limit zapytań do Logana per użytkownik (wspólny dla /ask, MCP i webowego czatu/analizy).
-export const LOGAN_DAILY_LIMIT = Number(Deno.env.get("LOGAN_DAILY_LIMIT") ?? "100");
+export const LOGAN_DAILY_LIMIT = Number(Deno.env.get("LOGAN_DAILY_LIMIT") ?? "10");
 
 export const CORS = {
   "Access-Control-Allow-Origin": "*",

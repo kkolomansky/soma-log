@@ -118,7 +118,7 @@ export default function DocsMcp() {
           </p>
           <p>
             <span className="text-txt">Limit zapytań:</span> narzędzie korzysta z tego samego dziennego limitu co REST
-            {' '}<code className="font-mono text-txt">/ask</code> — <span className="text-txt">100 zapytań na dobę per konto</span>
+            {' '}<code className="font-mono text-txt">/ask</code> — <span className="text-txt">10 zapytań na dobę per konto</span>
             {' '}(reset o północy, Europe/Warsaw). Po przekroczeniu narzędzie zwraca wynik z błędem (odpowiedź
             {' '}<code className="font-mono text-txt">429</code> z REST API).
           </p>
