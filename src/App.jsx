@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth';
 import { useEntries } from './hooks/useEntries';
 import { useChat } from './hooks/useChat';
 import { summarizeDay } from './lib/agent';
+import { RATE_LIMIT_EVENT } from './lib/usage';
 import { loadVoiceFromServer } from './lib/voice';
 import { toDateString, buildLast30Days } from './utils/dateUtils';
 import AppLayout from './layouts/AppLayout';
@@ -27,6 +28,7 @@ export default function App() {
   const [modulesOpen,  setModulesOpen]   = useState(false);
   const [showChat,     setShowChat]      = useState(false);
   const [showSettings, setShowSettings]  = useState(false);
+  const [settingsView, setSettingsView]  = useState('menu');
   const [draft,        setDraft]         = useState('');
 
   const { session, loading: authLoading, signIn, signUp, signOut } = useAuth();
@@ -39,6 +41,13 @@ export default function App() {
 
   // Po zalogowaniu wczytaj zapisany na koncie głos Logana do lokalnego cache (trwałość między sesjami).
   useEffect(() => { if (userId) loadVoiceFromServer(); }, [userId]);
+
+  // Po wyczerpaniu dziennego limitu (429 z dowolnego zapytania do Logana) otwórz panel na „Limity zapytań".
+  useEffect(() => {
+    const onLimited = () => { setSettingsView('usage'); setShowSettings(true); };
+    window.addEventListener(RATE_LIMIT_EVENT, onLimited);
+    return () => window.removeEventListener(RATE_LIMIT_EVENT, onLimited);
+  }, []);
 
   // Publiczna dokumentacja (API + MCP) — dostępna pod /docs niezależnie od logowania.
   if (path.startsWith('/docs')) return <Docs session={session} />;
@@ -98,7 +107,7 @@ export default function App() {
       modulesOpen={modulesOpen}
       onToggleModules={() => setModulesOpen(o => !o)}
       header={
-        <Header onSignOut={signOut} onOpenSettings={() => setShowSettings(true)} />
+        <Header onSignOut={signOut} onOpenSettings={() => { setSettingsView('menu'); setShowSettings(true); }} />
       }
       dayStrip={
         <DayStrip
@@ -155,6 +164,7 @@ export default function App() {
           <SettingsPanel
             open={showSettings}
             onClose={() => setShowSettings(false)}
+            initialView={settingsView}
           />
         </>
       }

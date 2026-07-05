@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { getVoice } from './voice';
+import { notifyRateLimited } from './usage';
 
 // Wrappery na Edge Functions agenta. supabase.functions.invoke dokleja JWT i apikey.
 
@@ -20,6 +21,7 @@ export async function chatWithAgent({ entryDate, history }, onToken) {
   if (!res.ok) {
     let msg = 'Błąd Logana';
     try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
+    if (res.status === 429) notifyRateLimited();
     throw new Error(msg);
   }
   if (!res.body) {
@@ -44,7 +46,10 @@ export async function summarizeDay({ entryDate }) {
   const { data, error } = await supabase.functions.invoke('agent', {
     body: { entryDate, mode: 'summary' },
   });
-  if (error) throw new Error(await readFnError(error));
+  if (error) {
+    if (error.context?.status === 429) notifyRateLimited();
+    throw new Error(await readFnError(error));
+  }
   if (data?.error) throw new Error(data.error);
   const full = data?.reply ?? '';
   // Pusta treść z modelu = nie zapisuj „pustej" analizy jako sukces — pokaż błąd, pozwól ponowić.

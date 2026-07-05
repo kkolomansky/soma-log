@@ -295,9 +295,10 @@ function SettingsMenu({ onOpenVoice, onOpenTokens, onOpenUsage }) {
 }
 
 // Panel użytkownika — menu ustawień. Pozycje (na razie „Głos Logana") wchodzą w podwidoki.
-export default function SettingsPanel({ open, onClose }) {
+export default function SettingsPanel({ open, onClose, initialView = 'menu' }) {
   const [view, setView] = useState('menu'); // 'menu' | 'voice' | 'tokens' | 'usage'
-  useEffect(() => { if (open) setView('menu'); }, [open]);
+  // Przy otwarciu ustaw widok startowy (np. 'usage' po wyczerpaniu limitu Logana).
+  useEffect(() => { if (open) setView(initialView); }, [open, initialView]);
 
   const inVoice = view === 'voice';
   const inTokens = view === 'tokens';
