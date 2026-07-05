@@ -17,6 +17,7 @@ import {
   runGetEntries,
   callXai,
   enforceRateLimit,
+  hybridContext,
 } from "../_shared/logan.ts";
 
 const METRIC_KEYS = METRICS.map((m) => m.key);
@@ -167,8 +168,14 @@ async function handleAsk(req: Request, userId: string) {
       role: "system",
       content: `${PERSONA}\n\n=== Wpis z dnia ${date} (kontekst) ===\n${formatEntry(entry)}`,
     },
-    { role: "user", content: question },
   ];
+
+  // Retrieval hybrydowy na podstawie pytania: pasujące wpisy z historii + ostatnie 7 dni.
+  // Klient service-role omija RLS, więc user_id podajemy jawnie.
+  const block = await hybridContext(admin, { query: question, referenceDate: date, userId });
+  if (block) messages.push({ role: "system", content: `=== Kontekst z dziennika (retrieval) ===\n${block}` });
+
+  messages.push({ role: "user", content: question });
 
   for (let i = 0; i < 5; i++) {
     const res = await callXai(messages, false, 2000);

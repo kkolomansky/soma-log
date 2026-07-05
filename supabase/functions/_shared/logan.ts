@@ -7,8 +7,17 @@ export const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
 export const XAI_URL = "https://api.x.ai/v1/chat/completions";
 export const MODEL = "grok-4-1-fast-reasoning";
 
+// OpenAI — embeddingi do wyszukiwania semantycznego (ten sam model co backfill kolumny embedding).
+export const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+export const OPENAI_EMBED_URL = "https://api.openai.com/v1/embeddings";
+export const EMBED_MODEL = "text-embedding-3-small";
+
 // Dzienny limit zapytań do Logana per użytkownik (wspólny dla /ask, MCP i webowego czatu/analizy).
 export const LOGAN_DAILY_LIMIT = Number(Deno.env.get("LOGAN_DAILY_LIMIT") ?? "10");
+
+// Parametry retrievalu hybrydowego (top-N na każde źródło + okno „ostatnich dni").
+export const HYBRID_MATCH_COUNT = Number(Deno.env.get("HYBRID_MATCH_COUNT") ?? "30");
+export const HYBRID_RECENT_DAYS = Number(Deno.env.get("HYBRID_RECENT_DAYS") ?? "7");
 
 export const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -130,6 +139,71 @@ export async function enforceRateLimit(
       },
     },
   );
+}
+
+// Kanoniczny kompozyt do embeddingu wpisu: data + 6 metryk + notatka. TEN SAM format musi być
+// użyty przy embedowaniu nowych wpisów (funkcja embed-entry) i przy re-backfillu, żeby wektory
+// starych i nowych wpisów żyły w spójnej przestrzeni.
+export function buildEmbeddingInput(e: Record<string, unknown>): string {
+  const lines = METRICS.map((m) => `${m.label}: ${e[m.key] ?? "—"}/100`);
+  const note = typeof e.note === "string" && e.note.trim() ? e.note.trim() : "(brak)";
+  return `Data: ${e.entry_date ?? "—"}\n${lines.join("\n")}\nNotatka: ${note}`;
+}
+
+// Embedding tekstu modelem OpenAI (zapytanie użytkownika albo kompozyt wpisu). Fail-open: przy
+// braku klucza/awarii zwraca null → retrieval hybrydowy leci dalej bez części wektorowej.
+export async function embedText(text: string): Promise<number[] | null> {
+  if (!OPENAI_API_KEY || !text.trim()) return null;
+  try {
+    const res = await fetch(OPENAI_EMBED_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model: EMBED_MODEL, input: text }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const vec = data?.data?.[0]?.embedding;
+    return Array.isArray(vec) ? vec : null;
+  } catch {
+    return null;
+  }
+}
+
+// Buduje blok kontekstu RAG dla Logana: wynik wyszukiwania hybrydowego (wektor top-N ∪ text top-N)
+// scalony z „ostatnimi N dniami". `userId` podaj przy kliencie service-role (funkcja `api`);
+// przy kliencie JWT (funkcja `agent`) pomiń — RPC odczyta auth.uid(). Pusty string, gdy brak wyników.
+export async function hybridContext(
+  client: SupabaseClient,
+  opts: { query: string; referenceDate: string; userId?: string },
+): Promise<string> {
+  const embedding = await embedText(opts.query);
+  const { data: rows, error } = await client.rpc("hybrid_search_soma_entries", {
+    query_embedding: embedding,
+    query_text: opts.query,
+    match_count: HYBRID_MATCH_COUNT,
+    recent_days: HYBRID_RECENT_DAYS,
+    reference_date: opts.referenceDate,
+    ...(opts.userId ? { filter_user_id: opts.userId } : {}),
+  });
+  if (error || !Array.isArray(rows) || rows.length === 0) return "";
+
+  const render = (e: Record<string, unknown>) => `[${e.entry_date}]\n${formatEntry(e)}`;
+  const recent = rows.filter((r) => r.is_recent).map(render);
+  const matched = rows.filter((r) => !r.is_recent).map(render);
+
+  const parts: string[] = [];
+  if (recent.length) {
+    parts.push(`=== Ostatnie ${HYBRID_RECENT_DAYS} dni (zawsze dołączane) ===\n${recent.join("\n\n")}`);
+  }
+  if (matched.length) {
+    parts.push(
+      `=== Pasujące wpisy z historii (wyszukiwanie hybrydowe: semantyka + słowa kluczowe) ===\n${matched.join("\n\n")}`,
+    );
+  }
+  return parts.join("\n\n");
 }
 
 export function callXai(messages: unknown[], stream: boolean, maxTokens?: number) {

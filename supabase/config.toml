@@ -6,6 +6,11 @@
 [functions.api]
 verify_jwt = false
 
+# embed-entry jest wołana przez trigger bazy (pg_net), nie przez JWT — bramka nie może wymuszać
+# weryfikacji JWT. Autoryzację robi sama funkcja (nagłówek-sekret x-embed-secret).
+[functions.embed-entry]
+verify_jwt = false
+
 # Pozostałe funkcje wymagają zalogowanego użytkownika (domyślne verify_jwt = true).
 [functions.agent]
 verify_jwt = true

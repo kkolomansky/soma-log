@@ -12,6 +12,7 @@ import {
   runGetEntries,
   callXai,
   enforceRateLimit,
+  hybridContext,
 } from "../_shared/logan.ts";
 
 const SUMMARY_INSTRUCTION = `Tryb: ANALIZA LOGANA (rozbudowane podsumowanie dnia). Przygotuj wnikliwą, rozbudowaną analizę stanu użytkownika na podstawie parametrów tego dnia, notatki ORAZ — jeśli została dołączona — rozmowy z tego dnia. Wykorzystaj narzędzie get_entries, aby porównać kilka ostatnich dni i ocenić trend (regeneracja vs narastające zmęczenie/ryzyko przetrenowania). Struktura: 3–5 akapitów — (1) ogólna ocena stanu i regeneracji, (2) interpretacja poszczególnych parametrów i ich zmian w czasie, (3) ryzyka (np. przetrenowanie) i sygnały ostrzegawcze, (4) konkretne, wykonalne zalecenia na najbliższe dni. Pisz po polsku, pełnymi zdaniami, bez nagłówków markdown.
@@ -108,6 +109,16 @@ Deno.serve(async (req) => {
   }
 
   // ── Tryb chat: strumień tekstu (SSE od xAI → text/plain deltas do klienta) ──
+  // Retrieval hybrydowy na podstawie ostatniej wiadomości użytkownika: pasujące wpisy z historii
+  // (semantyka + słowa kluczowe) + zawsze ostatnie 7 dni. Klient JWT → RPC odczyta auth.uid().
+  const lastUserMsg = [...history].reverse()
+    .find((m) => m && m.role === "user" && typeof m.content === "string");
+  const query = lastUserMsg?.content?.trim() ?? "";
+  if (query) {
+    const block = await hybridContext(supabase, { query, referenceDate: entryDate });
+    if (block) messages.push({ role: "system", content: `=== Kontekst z dziennika (retrieval) ===\n${block}` });
+  }
+
   for (const m of history) {
     if (m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string") {
       messages.push({ role: m.role, content: m.content });
