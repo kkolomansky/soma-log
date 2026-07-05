@@ -165,6 +165,7 @@ export default function App() {
             open={showSettings}
             onClose={() => setShowSettings(false)}
             initialView={settingsView}
+            email={session?.user?.email}
           />
         </>
       }

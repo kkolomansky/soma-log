@@ -47,8 +47,8 @@ export default function Auth({ onSignIn, onSignUp }) {
   return (
     <div className="px-4 pt-14 pb-4">
       <div className="mb-8 flex flex-col items-center text-center">
-        <LogoFull size={44} withTagline className="mb-7" />
-        <h1 className="text-2xl font-display font-bold text-txt tracking-tight">
+        <LogoFull size={44} withTagline centered className="mb-12" />
+        <h1 className="text-xl font-display font-bold text-txt tracking-tight">
           {isSignup ? 'Załóż konto' : 'Zaloguj się'}
         </h1>
         <p className="text-txt-3 text-sm mt-1">
