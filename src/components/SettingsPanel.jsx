@@ -295,7 +295,7 @@ function SettingsMenu({ onOpenVoice, onOpenTokens, onOpenUsage }) {
 }
 
 // Panel użytkownika — menu ustawień. Pozycje (na razie „Głos Logana") wchodzą w podwidoki.
-export default function SettingsPanel({ open, onClose, initialView = 'menu' }) {
+export default function SettingsPanel({ open, onClose, initialView = 'menu', email }) {
   const [view, setView] = useState('menu'); // 'menu' | 'voice' | 'tokens' | 'usage'
   // Przy otwarciu ustaw widok startowy (np. 'usage' po wyczerpaniu limitu Logana).
   useEffect(() => { if (open) setView(initialView); }, [open, initialView]);
@@ -304,6 +304,8 @@ export default function SettingsPanel({ open, onClose, initialView = 'menu' }) {
   const inTokens = view === 'tokens';
   const inUsage = view === 'usage';
   const inSub = inVoice || inTokens || inUsage;
+  // Nazwa użytkownika: dla logowania e-mailem — część przed „@".
+  const username = email ? email.split('@')[0] : null;
   const title = inVoice ? 'Głos Logana' : inTokens ? 'Tokeny API' : inUsage ? 'Limity zapytań' : 'Panel użytkownika';
 
   return (
@@ -333,7 +335,12 @@ export default function SettingsPanel({ open, onClose, initialView = 'menu' }) {
               ) : (
                 <span className="text-txt-3"><UserIcon size={18} /></span>
               )}
-              {title}
+              <span className="flex flex-col leading-tight">
+                <span>{title}</span>
+                {!inSub && username && (
+                  <span className="text-txt-3 text-xs font-normal">Zalogowano jako {username}</span>
+                )}
+              </span>
             </p>
             <button
               onClick={onClose}

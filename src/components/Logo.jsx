@@ -33,25 +33,42 @@ export function LogoMark({ size = 36, className = '', style, thinking = false })
 
 // Pełne logo: znak + wordmark „Soma.Log" + opcjonalny tagline.
 // Znak ma wielkość = wysokość bloku tekstu (wordmark + podpis), liczoną z `size`.
-export function LogoFull({ size = 40, withTagline = false, className = '' }) {
+// `centered` → wordmark wyśrodkowany w kontenerze, a znak wystaje absolutnie w lewo
+// (używane na ekranie logowania, by „Soma.Log" i nagłówek były na jednej osi).
+export function LogoFull({ size = 40, withTagline = false, className = '', centered = false }) {
   const wordmarkPx = size * 0.62;
   const taglinePx = size * 0.22;
   // Wysokość bloku tekstu (leading-none → line-height ≈ 1em); znak = tyle samo.
   const markSize = Math.round(withTagline ? wordmarkPx + 4 + taglinePx : wordmarkPx * 1.1);
 
+  const textBlock = (
+    <div className={`flex flex-col justify-center leading-none ${centered ? 'items-center' : ''}`}>
+      <span className="font-display font-bold tracking-tight text-txt" style={{ fontSize: wordmarkPx }}>
+        Soma<span className="text-recovery">.</span>Log
+      </span>
+      {withTagline && (
+        <p className="font-mono text-txt-3 tracking-[0.18em] uppercase mt-1" style={{ fontSize: taglinePx }}>
+          Body Operational System
+        </p>
+      )}
+    </div>
+  );
+
+  if (centered) {
+    return (
+      <div className={`relative inline-flex ${className}`}>
+        <span className="absolute top-1/2 -translate-y-1/2" style={{ right: 'calc(100% + 0.625rem)' }}>
+          <LogoMark size={markSize} className="shrink-0" />
+        </span>
+        {textBlock}
+      </div>
+    );
+  }
+
   return (
     <div className={`flex items-center gap-2.5 ${className}`}>
       <LogoMark size={markSize} className="shrink-0" />
-      <div className="flex flex-col justify-center leading-none">
-        <span className="font-display font-bold tracking-tight text-txt" style={{ fontSize: wordmarkPx }}>
-          Soma<span className="text-recovery">.</span>Log
-        </span>
-        {withTagline && (
-          <p className="font-mono text-txt-3 tracking-[0.18em] uppercase mt-1" style={{ fontSize: taglinePx }}>
-            Body Operational System
-          </p>
-        )}
-      </div>
+      {textBlock}
     </div>
   );
 }

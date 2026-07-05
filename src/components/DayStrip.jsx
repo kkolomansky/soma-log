@@ -23,6 +23,7 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }
   const itemRefs = useRef(new Map());
   const rafRef = useRef(0);
   const settleRef = useRef(null);
+  const holdRef = useRef({ timeout: null, interval: null });
   const today = toDateString(new Date());
   const [centerDate, setCenterDate] = useState(selectedDate);
 
@@ -95,6 +96,28 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
+  // Strzałki: klik → 1 pozycja; przytrzymanie → ciągłe, szybsze przewijanie
+  // aż do puszczenia / zjechania kursorem ze strzałki.
+  const step = useCallback((dir) => {
+    scrollerRef.current?.scrollBy({ left: dir * ITEM_W, behavior: 'smooth' });
+  }, []);
+
+  const stopHold = useCallback(() => {
+    if (holdRef.current.timeout) { clearTimeout(holdRef.current.timeout); holdRef.current.timeout = null; }
+    if (holdRef.current.interval) { clearInterval(holdRef.current.interval); holdRef.current.interval = null; }
+  }, []);
+
+  const startHold = useCallback((dir) => {
+    stopHold();
+    step(dir); // pojedynczy klik = pierwszy krok
+    holdRef.current.timeout = setTimeout(() => {
+      holdRef.current.interval = setInterval(() => step(dir), 140);
+    }, 320);
+  }, [step, stopHold]);
+
+  // Sprzątanie timerów przy odmontowaniu.
+  useEffect(() => stopHold, [stopHold]);
+
   const arrowBtn = 'shrink-0 w-9 h-9 rounded-full bg-surface border border-border text-txt-2 hover:text-txt hover:bg-elevated flex items-center justify-center transition-colors';
   const sidePad = `calc(50% - ${ITEM_W / 2}px)`;
 
@@ -105,7 +128,11 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }
       </p>
 
       <div className="flex items-center gap-1 px-2 pb-3">
-        <button onClick={() => scrollerRef.current?.scrollBy({ left: -ITEM_W, behavior: 'smooth' })}
+        <button
+          onPointerDown={() => startHold(-1)}
+          onPointerUp={stopHold}
+          onPointerLeave={stopHold}
+          onPointerCancel={stopHold}
           className={arrowBtn} aria-label="Wcześniej"><Chevron dir="left" /></button>
 
         <div
@@ -144,7 +171,11 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }
           })}
         </div>
 
-        <button onClick={() => scrollerRef.current?.scrollBy({ left: ITEM_W, behavior: 'smooth' })}
+        <button
+          onPointerDown={() => startHold(1)}
+          onPointerUp={stopHold}
+          onPointerLeave={stopHold}
+          onPointerCancel={stopHold}
           className={arrowBtn} aria-label="Później"><Chevron dir="right" /></button>
       </div>
     </div>

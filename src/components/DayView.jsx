@@ -237,7 +237,7 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
             {/* Zegar regeneracji + Podsumowanie Logana. Mobile: zegar kompaktowy + moduł.
                 Web (md+): obie połówki po równo, większy zegar. */}
             <div className="flex items-stretch gap-3 mb-6">
-              <div className="flex flex-col items-center justify-center gap-1.5 shrink-0 w-[108px] md:w-auto md:flex-1">
+              <div className="flex flex-col items-center justify-center gap-1.5 flex-1 min-w-0">
                 <CircularGauge value={score} max={100} color={label.color} size={isWide ? 156 : 108} strokeWidth={isWide ? 9 : 7} />
                 <p className="text-sm md:text-base font-display font-bold text-center leading-tight" style={{ color: label.color }}>
                   {label.text}
