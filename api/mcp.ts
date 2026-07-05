@@ -38,7 +38,11 @@ function buildServer(token: string): McpServer {
     try {
       const res = await fetch(`${API_BASE}${path}`, { ...init, headers: authHeaders });
       const text = await res.text();
-      return res.ok ? ok(text) : err(`Błąd API (${res.status}): ${text}`);
+      if (res.ok) return ok(text);
+      if (res.status === 429) {
+        return err(`Przekroczono dzienny limit zapytań do Logana — spróbuj ponownie jutro. ${text}`);
+      }
+      return err(`Błąd API (${res.status}): ${text}`);
     } catch (e) {
       return err(`Nie udało się połączyć z API SomaLog: ${String(e)}`);
     }

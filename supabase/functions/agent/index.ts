@@ -11,6 +11,7 @@ import {
   XAI_API_KEY,
   runGetEntries,
   callXai,
+  enforceRateLimit,
 } from "../_shared/logan.ts";
 
 const SUMMARY_INSTRUCTION = `Tryb: ANALIZA LOGANA (rozbudowane podsumowanie dnia). Przygotuj wnikliwą, rozbudowaną analizę stanu użytkownika na podstawie parametrów tego dnia, notatki ORAZ — jeśli została dołączona — rozmowy z tego dnia. Wykorzystaj narzędzie get_entries, aby porównać kilka ostatnich dni i ocenić trend (regeneracja vs narastające zmęczenie/ryzyko przetrenowania). Struktura: 3–5 akapitów — (1) ogólna ocena stanu i regeneracji, (2) interpretacja poszczególnych parametrów i ich zmian w czasie, (3) ryzyka (np. przetrenowanie) i sygnały ostrzegawcze, (4) konkretne, wykonalne zalecenia na najbliższe dni. Pisz po polsku, pełnymi zdaniami, bez nagłówków markdown.
@@ -42,6 +43,10 @@ Deno.serve(async (req) => {
   const mode = body.mode === "summary" ? "summary" : "chat";
   const history = Array.isArray(body.history) ? body.history : [];
   if (!entryDate) return json({ error: "Brak entryDate" }, 400);
+
+  // Rate limit — klient JWT, więc user_id wyznacza RPC z auth.uid(). Wspólny licznik z /ask.
+  const limited = await enforceRateLimit(supabase);
+  if (limited) return limited;
 
   const { data: todayEntry, error: todayErr } = await supabase
     .from("soma_entries")

@@ -16,6 +16,7 @@ import {
   XAI_API_KEY,
   runGetEntries,
   callXai,
+  enforceRateLimit,
 } from "../_shared/logan.ts";
 
 const METRIC_KEYS = METRICS.map((m) => m.key);
@@ -149,6 +150,10 @@ async function handleAsk(req: Request, userId: string) {
 
   const date = body.date ?? today();
   if (!isValidDate(date)) return json({ error: "Nieprawidłowa data (oczekiwano YYYY-MM-DD)" }, 400);
+
+  // Rate limit — service-role omija RLS, więc user_id podajemy jawnie.
+  const limited = await enforceRateLimit(admin, userId);
+  if (limited) return limited;
 
   const { data: entry } = await admin
     .from("soma_entries")

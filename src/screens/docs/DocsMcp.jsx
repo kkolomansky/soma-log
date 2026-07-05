@@ -116,6 +116,12 @@ export default function DocsMcp() {
             Zadaje pytanie trenerowi regeneracji „Logan” i zwraca jego odpowiedź. Bezstanowe. Opcjonalny dzień jest
             użyty jako kontekst (domyślnie dziś).
           </p>
+          <p>
+            <span className="text-txt">Limit zapytań:</span> narzędzie korzysta z tego samego dziennego limitu co REST
+            {' '}<code className="font-mono text-txt">/ask</code> — <span className="text-txt">100 zapytań na dobę per konto</span>
+            {' '}(reset o północy, Europe/Warsaw). Po przekroczeniu narzędzie zwraca wynik z błędem (odpowiedź
+            {' '}<code className="font-mono text-txt">429</code> z REST API).
+          </p>
           <div>
             <SubHeading>Parametry</SubHeading>
             <div className="mt-2">

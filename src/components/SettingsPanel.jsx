@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import SpeakButton from './SpeakButton';
-import { UserIcon, SpeakerIcon, KeyIcon } from './icons';
+import { UserIcon, SpeakerIcon, KeyIcon, GaugeIcon } from './icons';
 import { VOICES, SAMPLE_TEXT, getVoice, setVoice, saveVoiceToServer } from '../lib/voice';
 import { listTokens, createToken, revokeToken, API_BASE } from '../lib/apiTokens';
+import { getUsageToday, LOGAN_DAILY_LIMIT } from '../lib/usage';
 
 function CloseIcon({ size = 18 }) {
   return (
@@ -191,11 +192,85 @@ function TokensPanel() {
   );
 }
 
+// Aktualny offset GMT strefy Europe/Warsaw (np. "GMT+2" latem, "GMT+1" zimą).
+function warsawGmt() {
+  try {
+    const parts = new Intl.DateTimeFormat('pl-PL', { timeZone: 'Europe/Warsaw', timeZoneName: 'shortOffset' })
+      .formatToParts(new Date());
+    return parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT+2';
+  } catch { return 'GMT+2'; }
+}
+
+// Godzina resetu limitu (północ Europe/Warsaw) w czytelnej formie.
+function fmtResetTime(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('pl-PL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  } catch { return '—'; }
+}
+
+// Podgląd dziennego limitu zapytań do Logana (wspólny dla czatu, /ask i MCP). Tylko do odczytu.
+function UsagePanel() {
+  const [usage, setUsage] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setUsage(await getUsageToday()); setError(null); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const count = usage?.count ?? 0;
+  const remaining = Math.max(0, LOGAN_DAILY_LIMIT - count);
+  const pct = LOGAN_DAILY_LIMIT > 0 ? Math.min(100, Math.round((count / LOGAN_DAILY_LIMIT) * 100)) : 0;
+  const atLimit = count >= LOGAN_DAILY_LIMIT;
+
+  return (
+    <>
+      <p className="text-txt-3 text-[11px] leading-relaxed mb-3">
+        Zapytania do Logana (czat, analiza, endpoint <span className="text-txt-2">/ask</span> i narzędzie MCP)
+        są objęte wspólnym dziennym limitem per konto. Licznik zeruje się o północy (Europe/Warsaw, {warsawGmt()}).
+      </p>
+
+      {loading ? (
+        <p className="text-txt-3 text-[11px]">Ładowanie…</p>
+      ) : error ? (
+        <p className="text-danger text-[11px]">{error}</p>
+      ) : (
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <div className="flex items-baseline justify-between mb-2">
+            <span className="text-txt text-2xl font-display font-semibold tabular-nums">
+              {count}<span className="text-txt-3 text-base font-normal"> / {LOGAN_DAILY_LIMIT}</span>
+            </span>
+            <span className={`text-[11px] font-medium ${atLimit ? 'text-danger' : 'text-txt-3'}`}>
+              {atLimit ? 'limit wyczerpany' : `pozostało ${remaining}`}
+            </span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-elevated overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${atLimit ? 'bg-danger' : 'bg-recovery'}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="text-txt-3 text-[11px] leading-relaxed mt-3">
+            Reset: <span className="text-txt-2">{fmtResetTime(usage?.resetAt)}</span>
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+
 // Lista pozycji menu panelu.
-function SettingsMenu({ onOpenVoice, onOpenTokens }) {
+function SettingsMenu({ onOpenVoice, onOpenTokens, onOpenUsage }) {
   const items = [
     { id: 'voice', label: 'Głos Logana', desc: 'Wybór lektora odczytu analizy', Icon: SpeakerIcon, onClick: onOpenVoice },
     { id: 'tokens', label: 'Tokeny API', desc: 'Sterowanie aplikacją spoza SomaLog', Icon: KeyIcon, onClick: onOpenTokens },
+    { id: 'usage', label: 'Limity zapytań', desc: 'Dzienne zużycie limitu Logana', Icon: GaugeIcon, onClick: onOpenUsage },
   ];
   return (
     <div className="flex flex-col gap-1.5">
@@ -221,13 +296,14 @@ function SettingsMenu({ onOpenVoice, onOpenTokens }) {
 
 // Panel użytkownika — menu ustawień. Pozycje (na razie „Głos Logana") wchodzą w podwidoki.
 export default function SettingsPanel({ open, onClose }) {
-  const [view, setView] = useState('menu'); // 'menu' | 'voice' | 'tokens'
+  const [view, setView] = useState('menu'); // 'menu' | 'voice' | 'tokens' | 'usage'
   useEffect(() => { if (open) setView('menu'); }, [open]);
 
   const inVoice = view === 'voice';
   const inTokens = view === 'tokens';
-  const inSub = inVoice || inTokens;
-  const title = inVoice ? 'Głos Logana' : inTokens ? 'Tokeny API' : 'Panel użytkownika';
+  const inUsage = view === 'usage';
+  const inSub = inVoice || inTokens || inUsage;
+  const title = inVoice ? 'Głos Logana' : inTokens ? 'Tokeny API' : inUsage ? 'Limity zapytań' : 'Panel użytkownika';
 
   return (
     <>
@@ -269,7 +345,8 @@ export default function SettingsPanel({ open, onClose }) {
 
           {inVoice ? <VoicePicker />
             : inTokens ? <TokensPanel />
-            : <SettingsMenu onOpenVoice={() => setView('voice')} onOpenTokens={() => setView('tokens')} />}
+            : inUsage ? <UsagePanel />
+            : <SettingsMenu onOpenVoice={() => setView('voice')} onOpenTokens={() => setView('tokens')} onOpenUsage={() => setView('usage')} />}
         </div>
       </div>
     </>
