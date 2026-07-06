@@ -3,18 +3,31 @@ import { formatFullDate } from '../utils/dateUtils';
 import { METRICS, METRIC_DEFAULTS } from '../utils/metrics';
 import Slider from './Slider';
 import MicButton from './MicButton';
-import { NoteIcon } from './icons';
+import { NoteIcon, PhotoPlusIcon } from './icons';
 import { useAutoGrow } from '../hooks/useAutoGrow';
+import { uploadPhoto, removePhotos, signedUrls } from '../lib/photos';
+import PhotoFrame from './PhotoFrame';
+import ConfirmModal from './ConfirmModal';
 
 function pickMetrics(entry) {
   return Object.fromEntries(METRICS.map(m => [m.key, entry[m.key]]));
 }
 
-export default function AddEntryModal({ open, onClose, onSave, initialEntry = null, selectedDate, focusKey = null }) {
+export default function AddEntryModal({ open, onClose, onSave, userId, initialEntry = null, selectedDate, focusKey = null }) {
   const [values, setValues] = useState(METRIC_DEFAULTS);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [highlight, setHighlight] = useState(null);
+
+  // Zdjęcia: existingPhotos = zachowane ścieżki z wpisu; newFiles = wybrane, jeszcze niewgrane;
+  // removedPaths = istniejące oznaczone do usunięcia (kasujemy w Storage dopiero po udanym zapisie).
+  const [existingPhotos, setExistingPhotos] = useState([]);
+  const [existingUrls, setExistingUrls] = useState({}); // ścieżka → signed URL (podgląd)
+  const [newFiles, setNewFiles] = useState([]);          // [{ id, file, previewUrl }]
+  const [removedPaths, setRemovedPaths] = useState([]);
+  const [photoError, setPhotoError] = useState(null);
+  const [confirmRemove, setConfirmRemove] = useState(null); // { kind: 'existing'|'new', key } | null
+  const fileInputRef = useRef(null);
 
   // Przeciągnięcie sheetu w dół (mobile) → zamknięcie.
   const panelRef = useRef(null);
@@ -32,10 +45,66 @@ export default function AddEntryModal({ open, onClose, onSave, initialEntry = nu
       // Edycja istniejącego dnia → prefill jego wartościami; nowy wpis → wartości domyślne.
       setValues(initialEntry ? pickMetrics(initialEntry) : METRIC_DEFAULTS);
       setNote(initialEntry?.note ?? '');
+      setExistingPhotos(initialEntry?.photos ?? []);
+      setPhotoError(null);
       setSaving(false);
       setDragY(0);
     }
   }, [open, initialEntry]);
+
+  // Po zamknięciu: sprzątnij podglądy wybranych plików. Upload jeszcze nie nastąpił,
+  // więc anulowanie okna nie zostawia sierot w Storage.
+  useEffect(() => {
+    if (!open) {
+      setNewFiles(prev => { prev.forEach(nf => URL.revokeObjectURL(nf.previewUrl)); return []; });
+      setRemovedPaths([]);
+      setConfirmRemove(null);
+    }
+  }, [open]);
+
+  // Signed URLs do podglądu istniejących zdjęć (bucket jest prywatny).
+  useEffect(() => {
+    let cancelled = false;
+    const paths = initialEntry?.photos ?? [];
+    if (!open || paths.length === 0) { setExistingUrls({}); return; }
+    signedUrls(paths)
+      .then(list => {
+        if (cancelled) return;
+        const map = {};
+        for (const { path, url } of list) map[path] = url;
+        setExistingUrls(map);
+      })
+      .catch(() => { if (!cancelled) setExistingUrls({}); });
+    return () => { cancelled = true; };
+  }, [open, initialEntry]);
+
+  const handleFilePick = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setNewFiles(prev => [
+        ...prev,
+        ...files.map(file => ({ id: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) })),
+      ]);
+    }
+    e.target.value = ''; // pozwól ponownie wybrać ten sam plik
+  };
+
+  // Usuwanie zdjęcia zawsze po potwierdzeniu (setConfirmRemove otwiera dialog).
+  const confirmRemovePhoto = () => {
+    if (!confirmRemove) return;
+    const { kind, key } = confirmRemove;
+    if (kind === 'existing') {
+      setExistingPhotos(prev => prev.filter(p => p !== key));
+      setRemovedPaths(prev => [...prev, key]);
+    } else {
+      setNewFiles(prev => {
+        const gone = prev.find(nf => nf.id === key);
+        if (gone) URL.revokeObjectURL(gone.previewUrl);
+        return prev.filter(nf => nf.id !== key);
+      });
+    }
+    setConfirmRemove(null);
+  };
 
   // Po otwarciu z konkretnym parametrem: przewiń do niego i chwilowo podświetl.
   useEffect(() => {
@@ -50,7 +119,19 @@ export default function AddEntryModal({ open, onClose, onSave, initialEntry = nu
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave({ ...values, note: note.trim() });
+    setPhotoError(null);
+    try {
+      // Upload wybranych plików dopiero teraz → brak sierot przy anulowaniu.
+      const uploaded = [];
+      for (const nf of newFiles) uploaded.push(await uploadPhoto(userId, nf.file));
+      const finalPhotos = [...existingPhotos, ...uploaded];
+      await onSave({ ...values, note: note.trim(), photos: finalPhotos });
+      // Po udanym zapisie skasuj pliki oznaczone do usunięcia (nie blokuj UI błędem sprzątania).
+      if (removedPaths.length) await removePhotos(removedPaths).catch(() => {});
+    } catch (err) {
+      setPhotoError(err?.message || 'Nie udało się zapisać zdjęć. Spróbuj ponownie.');
+      setSaving(false);
+    }
   };
 
   // Gest „pull-to-dismiss" — tylko ruch w dół.
@@ -146,15 +227,54 @@ export default function AddEntryModal({ open, onClose, onSave, initialEntry = nu
               ))}
             </div>
 
-            {/* Notatka — mikrofon na wysokości etykiety, dyktowanie dopisuje tekst */}
+            {/* Notatka — zdjęcia nad treścią; „+" (zdjęcie) i mikrofon na wysokości etykiety */}
             <div className="bg-surface border border-border rounded-2xl p-4 mb-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="flex items-center gap-1.5 text-txt-3 text-xs font-medium uppercase tracking-wide">
                   <span className="text-[#0E7490]"><NoteIcon size={14} /></span>
                   Notatka
                 </p>
-                <MicButton getText={() => note} onText={(joined) => setNote(joined)} size={28} iconSize={15} />
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-label="Dodaj zdjęcie"
+                    title="Dodaj zdjęcie"
+                    style={{ width: 28, height: 28 }}
+                    className="rounded-full flex items-center justify-center shrink-0 bg-elevated text-txt-3 hover:text-txt transition-colors"
+                  >
+                    <PhotoPlusIcon size={15} />
+                  </button>
+                  <MicButton getText={() => note} onText={(joined) => setNote(joined)} size={28} iconSize={15} />
+                </div>
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFilePick}
+                className="hidden"
+              />
+              {(existingPhotos.length > 0 || newFiles.length > 0) && (
+                <div className="flex flex-col items-center gap-2 mb-3">
+                  {existingPhotos.map(path => (
+                    <PhotoFrame
+                      key={path}
+                      src={existingUrls[path]}
+                      onRemove={() => setConfirmRemove({ kind: 'existing', key: path })}
+                    />
+                  ))}
+                  {newFiles.map(nf => (
+                    <PhotoFrame
+                      key={nf.id}
+                      src={nf.previewUrl}
+                      onRemove={() => setConfirmRemove({ kind: 'new', key: nf.id })}
+                    />
+                  ))}
+                </div>
+              )}
+              {photoError && <p className="text-danger text-xs mb-2">{photoError}</p>}
               <textarea
                 ref={noteRef}
                 value={note}
@@ -175,6 +295,13 @@ export default function AddEntryModal({ open, onClose, onSave, initialEntry = nu
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={!!confirmRemove}
+        title="Czy na pewno chcesz usunąć to zdjęcie?"
+        onCancel={() => setConfirmRemove(null)}
+        onConfirm={confirmRemovePhoto}
+      />
     </>
   );
 }

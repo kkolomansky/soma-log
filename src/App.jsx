@@ -83,10 +83,11 @@ export default function App() {
   };
 
   // Zapis samej notatki (edycja inline w podglądzie dnia) — zachowuje pozostałe parametry.
-  const handleSaveNote = async (note) => {
+  // Inline zapis z podglądu dnia: notatka + zdjęcia razem (NoteCard zarządza obydwoma).
+  const handleSaveNote = async ({ note, photos }) => {
     if (!selectedEntry) return;
     const { sleep, energy, motivation, fatigue, doms, stress } = selectedEntry;
-    await saveEntry(selectedDate, { sleep, energy, motivation, fatigue, doms, stress, note });
+    await saveEntry(selectedDate, { sleep, energy, motivation, fatigue, doms, stress, note, photos });
   };
 
   // Wysłanie wiadomości do agenta — czyści composer i otwiera rozmowę dnia.
@@ -123,6 +124,7 @@ export default function App() {
           days={DAYS}
           selectedDate={selectedDate}
           entries={entries}
+          userId={userId}
           onSelect={setSelectedDate}
           onAddClick={handleAddClick}
           onDelete={deleteEntry}
@@ -146,6 +148,7 @@ export default function App() {
             open={showAddModal}
             onClose={() => setShowAddModal(false)}
             onSave={handleSave}
+            userId={userId}
             initialEntry={selectedEntry}
             selectedDate={selectedDate}
             focusKey={editFocusKey}

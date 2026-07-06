@@ -195,6 +195,18 @@ export function NoteIcon(props) {
   );
 }
 
+// Zdjęcie + — ramka obrazka z plusem (dodawanie zdjęcia do wpisu)
+export function PhotoPlusIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M19 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8" />
+      <circle cx="8.5" cy="9" r="1.5" />
+      <path d="M3 16l4-4 4 4 3-3 3 3" />
+      <path d="M18 3v6M15 6h6" />
+    </Svg>
+  );
+}
+
 // Token / API — klucz
 export function KeyIcon(props) {
   return (
