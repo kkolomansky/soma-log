@@ -32,7 +32,9 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect, 
   const itemRefs = useRef(new Map());
   const rafRef = useRef(0);
   const settleRef = useRef(null);
-  const holdRef = useRef({ timeout: null, interval: null });
+  const holdRef = useRef({ timeout: null, raf: null });
+  const dragRef = useRef(null);
+  const draggedRef = useRef(false);
   const today = toDateString(new Date());
   const [centerDate, setCenterDate] = useState(selectedDate);
 
@@ -105,24 +107,65 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
-  // Strzałki: klik → 1 pozycja; przytrzymanie → ciągłe, szybsze przewijanie
-  // aż do puszczenia / zjechania kursorem ze strzałki.
-  const step = useCallback((dir) => {
-    scrollerRef.current?.scrollBy({ left: dir * ITEM_W, behavior: 'smooth' });
-  }, []);
-
+  // Strzałki: klik → 1 pozycja; przytrzymanie → płynne przewijanie, które PRZYSPIESZA
+  // z czasem trzymania (dla dłuższych okresów szybciej dojedziemy do celu).
   const stopHold = useCallback(() => {
     if (holdRef.current.timeout) { clearTimeout(holdRef.current.timeout); holdRef.current.timeout = null; }
-    if (holdRef.current.interval) { clearInterval(holdRef.current.interval); holdRef.current.interval = null; }
+    if (holdRef.current.raf) { cancelAnimationFrame(holdRef.current.raf); holdRef.current.raf = null; }
   }, []);
 
   const startHold = useCallback((dir) => {
     stopHold();
-    step(dir); // pojedynczy klik = pierwszy krok
+    scrollerRef.current?.scrollBy({ left: dir * ITEM_W, behavior: 'smooth' }); // klik = 1 krok
+    const startTime = performance.now();
     holdRef.current.timeout = setTimeout(() => {
-      holdRef.current.interval = setInterval(() => step(dir), 140);
-    }, 320);
-  }, [step, stopHold]);
+      let last = performance.now();
+      const loop = (now) => {
+        const held = now - startTime;
+        const dt = Math.min(now - last, 50); last = now;
+        // px/ms: start ~0.5 (≈ dotychczasowe tempo), rośnie do 3.0 przy dłuższym trzymaniu.
+        const speed = Math.min(0.5 + held / 700, 3);
+        const sc = scrollerRef.current;
+        if (sc) sc.scrollLeft += dir * speed * dt;
+        holdRef.current.raf = requestAnimationFrame(loop);
+      };
+      holdRef.current.raf = requestAnimationFrame(loop);
+    }, 300);
+  }, [stopHold]);
+
+  // Przeciąganie karuzeli myszą (jak wykres trendów). Dotyk/pen → natywne przewijanie.
+  // Przechwycenie wskaźnika dopiero po realnym ruchu, by nie psuć zwykłych kliknięć w dzień.
+  const onDragStart = useCallback((e) => {
+    if (e.pointerType !== 'mouse') return;
+    const sc = scrollerRef.current; if (!sc) return;
+    dragRef.current = { startX: e.clientX, startScroll: sc.scrollLeft, capturing: false };
+    draggedRef.current = false;
+  }, []);
+  const onDragMove = useCallback((e) => {
+    const d = dragRef.current; if (!d) return;
+    const dx = e.clientX - d.startX;
+    if (!d.capturing && Math.abs(dx) > 4) {
+      d.capturing = true;
+      draggedRef.current = true;
+      const sc = scrollerRef.current;
+      if (sc) { sc.style.scrollSnapType = 'none'; sc.setPointerCapture?.(e.pointerId); }
+    }
+    if (d.capturing) {
+      const sc = scrollerRef.current;
+      if (sc) sc.scrollLeft = d.startScroll - dx;
+    }
+  }, []);
+  const onDragEnd = useCallback((e) => {
+    const d = dragRef.current; if (!d) return;
+    dragRef.current = null;
+    const sc = scrollerRef.current;
+    if (sc && d.capturing) {
+      sc.style.scrollSnapType = 'x mandatory';
+      sc.releasePointerCapture?.(e.pointerId);
+      const best = nearestDate();
+      if (best) centerOn(best, 'smooth'); // domknij do najbliższego dnia
+    }
+  }, [nearestDate, centerOn]);
 
   // Sprzątanie timerów przy odmontowaniu.
   useEffect(() => stopHold, [stopHold]);
@@ -173,7 +216,11 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect, 
         <div
           ref={scrollerRef}
           onScroll={onScroll}
-          className="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-hide py-2 isolate"
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          className="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-hide py-2 isolate cursor-grab active:cursor-grabbing"
           style={{ scrollSnapType: 'x mandatory', paddingLeft: sidePad, paddingRight: sidePad }}
         >
           {days.map(dateStr => {
@@ -187,7 +234,7 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect, 
               <button
                 key={dateStr}
                 ref={el => { if (el) itemRefs.current.set(dateStr, el); else itemRefs.current.delete(dateStr); }}
-                onClick={() => centerOn(dateStr)}
+                onClick={() => { if (draggedRef.current) { draggedRef.current = false; return; } centerOn(dateStr); }}
                 style={{ scrollSnapAlign: 'center', transformOrigin: 'center', borderColor: col ?? undefined }}
                 className={`relative shrink-0 w-[72px] h-[72px] rounded-full flex flex-col items-center justify-center will-change-transform transition-[background-color,border-color]
                   ${entry ? 'border-2' : 'border border-border'}
