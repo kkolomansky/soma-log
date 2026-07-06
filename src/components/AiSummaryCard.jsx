@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { AiIcon, RefreshIcon } from './icons';
 import ThinkingIndicator from './ThinkingIndicator';
 import SpeakButton from './SpeakButton';
+import { useTypewriter } from '../hooks/useTypewriter';
 
 function Spinner({ size = 14 }) {
   return (
@@ -13,22 +14,20 @@ function Spinner({ size = 14 }) {
 }
 
 // Okno pod notatką: pełna, rozbudowana analiza Logana dla danego dnia. Na żądanie.
-export default function AiSummaryCard({ summary, onAnalyze }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+// Ładowanie/analiza sterowane z DayView (współdzielone z wyciągiem), tekst „pisze się"
+// po zakończeniu analizy (playKey).
+export default function AiSummaryCard({ summary, onAnalyze, loading = false, error = null, playKey = 0 }) {
+  const [speakError, setSpeakError] = useState(null);
+  const scrollRef = useRef(null);
   const hasSummary = summary && summary.trim().length > 0;
+  const shown = useTypewriter(summary || '', playKey);
 
-  const handle = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await onAnalyze();
-    } catch (e) {
-      setError(e.message || 'Nie udało się wygenerować analizy.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Podczas „pisania" trzymaj widok przy najnowszym tekście.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [shown]);
+
+  const shownError = error || speakError;
 
   return (
     <div className="bg-surface border border-border rounded-2xl p-4">
@@ -37,10 +36,10 @@ export default function AiSummaryCard({ summary, onAnalyze }) {
           <span className="text-ai"><AiIcon size={14} /></span>
           Analiza Logana
         </p>
-        {hasSummary && (
+        {hasSummary && !loading && (
           <div className="flex items-center gap-0.5">
             <button
-              onClick={handle}
+              onClick={onAnalyze}
               disabled={loading}
               title="Odśwież analizę"
               aria-label="Odśwież analizę"
@@ -48,7 +47,7 @@ export default function AiSummaryCard({ summary, onAnalyze }) {
             >
               {loading ? <Spinner /> : <RefreshIcon size={14} />}
             </button>
-            <SpeakButton text={summary} onError={setError} />
+            <SpeakButton text={summary} onError={setSpeakError} />
           </div>
         )}
       </div>
@@ -58,8 +57,8 @@ export default function AiSummaryCard({ summary, onAnalyze }) {
           <ThinkingIndicator label="Logan analizuje dzień…" />
         </div>
       ) : hasSummary ? (
-        <div className="max-h-[90px] overflow-y-auto pr-2">
-          <p className="text-txt-2 text-[11px] leading-relaxed whitespace-pre-wrap break-words md:text-justify">{summary}</p>
+        <div ref={scrollRef} className="max-h-[90px] overflow-y-auto pr-2">
+          <p className="text-txt-2 text-[11px] leading-relaxed whitespace-pre-wrap break-words md:text-justify">{shown}</p>
         </div>
       ) : (
         <div className="flex flex-col items-center text-center gap-3 py-1">
@@ -67,7 +66,7 @@ export default function AiSummaryCard({ summary, onAnalyze }) {
             Poproś Logana o ocenę stanu z tego dnia i wskazówki, co poprawić.
           </p>
           <button
-            onClick={handle}
+            onClick={onAnalyze}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-ai/15 text-ai text-sm font-semibold hover:bg-ai/25 active:scale-95 transition-all"
           >
             <AiIcon size={16} /> Analizuj dzień
@@ -75,7 +74,7 @@ export default function AiSummaryCard({ summary, onAnalyze }) {
         </div>
       )}
 
-      {error && <p className="text-danger text-xs mt-2 text-center">{error}</p>}
+      {shownError && <p className="text-danger text-xs mt-2 text-center">{shownError}</p>}
     </div>
   );
 }

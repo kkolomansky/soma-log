@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useEntries } from './hooks/useEntries';
 import { useChat } from './hooks/useChat';
 import { summarizeDay } from './lib/agent';
 import { RATE_LIMIT_EVENT } from './lib/usage';
 import { loadVoiceFromServer } from './lib/voice';
-import { toDateString, buildLast30Days } from './utils/dateUtils';
+import { toDateString, buildLast30Days, buildDayRange } from './utils/dateUtils';
 import AppLayout from './layouts/AppLayout';
 import Header from './components/Header';
 import DayStrip from './components/DayStrip';
@@ -14,11 +14,12 @@ import InputBar from './components/InputBar';
 import ChatPanel from './components/ChatPanel';
 import AddEntryModal from './components/AddEntryModal';
 import SettingsPanel from './components/SettingsPanel';
+import DateRangePicker from './components/DateRangePicker';
 import Auth from './screens/Auth';
 import Docs from './screens/Docs';
 import { useRoute } from './lib/nav';
 
-const DAYS = buildLast30Days();
+const DEFAULT_DAYS = buildLast30Days();
 
 export default function App() {
   const path = useRoute();
@@ -30,6 +31,15 @@ export default function App() {
   const [showSettings, setShowSettings]  = useState(false);
   const [settingsView, setSettingsView]  = useState('menu');
   const [draft,        setDraft]         = useState('');
+  // Wybrany okres karuzeli: null = domyślnie ostatni miesiąc; { start, end } = filtr.
+  const [range,        setRange]         = useState(null);
+  const [showRangePicker, setShowRangePicker] = useState(false);
+
+  // Zakres dni karuzeli: domyślnie ostatnie 30 dni, albo wybrany okres (filtruje do zakresu).
+  const DAYS = useMemo(
+    () => (range ? buildDayRange(range.start, range.end) : DEFAULT_DAYS),
+    [range],
+  );
 
   const { session, loading: authLoading, signIn, signUp, signOut } = useAuth();
   const userId = session?.user?.id ?? null;
@@ -97,6 +107,19 @@ export default function App() {
     sendMessage(text);
   };
 
+  // Wybór okresu z kalendarza → filtruj karuzelę do zakresu i wyśrodkuj na dacie końca.
+  const handleApplyRange = (start, end) => {
+    setRange({ start, end });
+    setSelectedDate(end);
+    setShowRangePicker(false);
+  };
+
+  // Powrót do domyślnego widoku (ostatni miesiąc) + dziś.
+  const handleResetRange = () => {
+    setRange(null);
+    setSelectedDate(toDateString(new Date()));
+  };
+
   // „Analizuj dzień" → analiza Logana (pełna + skrót) zapisana w soma_entries.
   const handleAnalyze = async () => {
     const { full, short } = await summarizeDay({ entryDate: selectedDate });
@@ -116,6 +139,9 @@ export default function App() {
           selectedDate={selectedDate}
           entriesByDate={entriesByDate}
           onSelect={setSelectedDate}
+          hasCustomRange={!!range}
+          onOpenRange={() => setShowRangePicker(true)}
+          onResetRange={handleResetRange}
         />
       }
       dayView={
@@ -169,6 +195,13 @@ export default function App() {
             onClose={() => setShowSettings(false)}
             initialView={settingsView}
             email={session?.user?.email}
+          />
+          <DateRangePicker
+            open={showRangePicker}
+            onClose={() => setShowRangePicker(false)}
+            onApply={handleApplyRange}
+            initialStart={range?.start}
+            initialEnd={range?.end}
           />
         </>
       }

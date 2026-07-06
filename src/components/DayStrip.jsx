@@ -13,12 +13,21 @@ function Chevron({ dir }) {
   );
 }
 
+function ChevronDown({ size = 13 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none"
+      stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
 /**
  * Pozioma karuzela dni z efektem 3D: wyśrodkowany dzień jest pełny i podświetlony,
  * sąsiednie skalowane/wyszarzone i lekko obrócone (jak rzut karuzeli od frontu).
  * Wyśrodkowany dzień = wybrany dzień. Działa na mobile i desktopie.
  */
-export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }) {
+export default function DayStrip({ days, selectedDate, entriesByDate, onSelect, hasCustomRange, onOpenRange, onResetRange }) {
   const scrollerRef = useRef(null);
   const itemRefs = useRef(new Map());
   const rafRef = useRef(0);
@@ -123,9 +132,35 @@ export default function DayStrip({ days, selectedDate, entriesByDate, onSelect }
 
   return (
     <div className="select-none border-b border-divider">
-      <p className="text-center text-txt-3 text-xs font-display font-semibold uppercase tracking-wide pt-3 pb-1 capitalize">
-        {formatMonthYear(centerDate)}
-      </p>
+      <div className="flex items-center justify-center gap-2 pt-3 pb-1">
+        {/* Nazwa miesiąca/rok = przycisk otwierający kalendarz wyboru okresu. */}
+        <button
+          onClick={onOpenRange}
+          className="flex items-center gap-1 text-txt-3 hover:text-txt transition-colors"
+          aria-label="Wybierz okres"
+        >
+          <span className="text-xs font-display font-semibold uppercase tracking-wide capitalize">
+            {formatMonthYear(centerDate)}
+          </span>
+          <ChevronDown />
+        </button>
+
+        {/* Oznaczenie: karuzela pokazuje wybrany okres, nie domyślny ostatni miesiąc. */}
+        {hasCustomRange && (
+          <span className="flex items-center gap-1 rounded-full bg-recovery/15 text-recovery text-[10px] font-medium pl-2 pr-1 py-0.5">
+            Wybrany okres
+            <button
+              onClick={onResetRange}
+              aria-label="Wróć do ostatniego miesiąca"
+              className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-recovery/25 transition-colors"
+            >
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </span>
+        )}
+      </div>
 
       <div className="flex items-center gap-1 px-2 pb-3">
         <button

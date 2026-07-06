@@ -56,7 +56,7 @@ export default function ChatPanel({
 
       {/* Sheet */}
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 flex flex-col bg-bg border-t border-border rounded-t-3xl
+        className={`fixed inset-x-0 bottom-0 z-50 flex flex-col bg-bg border-x-2 border-t-2 border-border-strong rounded-t-3xl shadow-2xl shadow-black/50
           h-[80vh] max-w-3xl mx-auto transition-transform duration-300 ${
             open ? 'translate-y-0' : 'translate-y-full'
           }`}
@@ -94,10 +94,12 @@ export default function ChatPanel({
             <Bubble key={m.id} role={m.role} content={m.content} />
           ))}
 
-          {sending && (
+          {/* Wskaźnik „myślenia" tylko dopóki nie zacznie napływać strumień odpowiedzi
+              (gdy ostatnia wiadomość to już odpowiedź Logana, pokazuje się jej treść). */}
+          {sending && messages[messages.length - 1]?.role !== 'assistant' && (
             <div className="flex justify-start">
               <div className="bg-surface border border-border rounded-2xl rounded-bl-md px-3.5 py-2.5">
-                <ThinkingIndicator label="Trener analizuje…" textClass="text-[12px]" />
+                <ThinkingIndicator label="Logan analizuje…" textClass="text-[12px]" />
               </div>
             </div>
           )}

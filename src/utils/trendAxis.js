@@ -11,42 +11,40 @@ const labelDM = (ms) => { const d = new Date(ms); return `${d.getDate()} ${MONTH
 const labelMY = (ms) => { const d = new Date(ms); return `${MONTHS_PL[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`; };
 const tick = (ms, label) => ({ ms, label });
 
-// Dedup po dniu (zachowuje pierwszy) + sort rosnąco.
-function dedupSort(ticks) {
-  const seen = new Map();
-  for (const t of ticks) {
-    const key = toDateString(new Date(t.ms));
-    if (!seen.has(key)) seen.set(key, t);
-  }
-  return [...seen.values()].sort((a, b) => a.ms - b.ms);
+// Pierwszy dzień miesiąca (południe) dla danego ms.
+function firstOfMonth(ms) {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), 1, 12).getTime();
 }
-
-// Pierwsze dni miesięcy w przedziale (start, end].
-function firstOfMonthsBetween(startMs, endMs) {
-  const res = [];
-  const d = new Date(startMs);
-  let cur = new Date(d.getFullYear(), d.getMonth() + 1, 1, 12); // pierwszy 1. po starcie
-  while (cur.getTime() <= endMs) {
-    res.push(cur.getTime());
-    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1, 12);
-  }
-  return res;
+// Przesunięcie o n miesięcy (zachowuje południe, bezpieczne dla granic miesięcy).
+function addMonths(ms, n) {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth() + n, 1, 12).getTime();
 }
+function clampMs(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-// Przerzedza do max N ticków, zachowując pierwszy i ostatni.
-function thin(ticks, max) {
-  if (ticks.length <= max) return ticks;
-  const step = (ticks.length - 1) / (max - 1);
-  const picked = [];
-  for (let i = 0; i < max; i++) picked.push(ticks[Math.round(i * step)]);
-  return dedupSort(picked);
+const WINDOW_MONTHS = 12; // „Wszystko": widoczne okno = ostatni rok, przewijane w głąb historii.
+
+/**
+ * Granice przewijania widoku „Wszystko": { spanStart, spanEnd, minEnd, maxEnd, canPan }.
+ * Okno ma stałą długość WINDOW_MONTHS; windowEnd porusza się w [minEnd, maxEnd].
+ */
+export function allRangeBounds(entries) {
+  const todayMs = dateStrToMs(toDateString(new Date()));
+  const msList = entries.map(e => dateStrToMs(e.entryDate));
+  const earliest = msList.length ? Math.min(...msList) : todayMs;
+  const spanStart = firstOfMonth(earliest);
+  const spanEnd = todayMs;
+  const minEnd = addMonths(spanStart, WINDOW_MONTHS);
+  const maxEnd = spanEnd;
+  return { spanStart, spanEnd, minEnd: Math.min(minEnd, maxEnd), maxEnd, canPan: minEnd < maxEnd };
 }
 
 /**
  * Oś czasowa wykresu trendów: { startMs, endMs, ticks: [{ ms, label }] }.
  * rangeDays: 7 | 30 | null (Wszystko). Dla „Wszystko" skala adaptacyjna wg rozpiętości danych.
  */
-export function buildTimeAxis(rangeDays, entries) {
+export function buildTimeAxis(rangeDays, entries, windowEndMs) {
   const todayMs = dateStrToMs(toDateString(new Date()));
 
   // 7 dni — tick na każdy z 7 dni.
@@ -56,34 +54,34 @@ export function buildTimeAxis(rangeDays, entries) {
     return { startMs, endMs: todayMs, ticks };
   }
 
-  // 30 dni — dziś, miesiąc wstecz, granica miesiąca + kilka równych.
+  // 30 dni — 7 równo rozłożonych dat co 5 dni (0,5,…,30 wstecz).
   if (rangeDays === 30) {
     const startMs = todayMs - 30 * DAY;
-    const raw = [tick(startMs, labelDM(startMs)), tick(todayMs, labelDM(todayMs))];
-    for (const ms of firstOfMonthsBetween(startMs, todayMs)) raw.push(tick(ms, labelDM(ms)));
-    for (const f of [1 / 3, 2 / 3]) {
-      const ms = startMs + Math.round((todayMs - startMs) * f);
-      raw.push(tick(ms, labelDM(ms)));
-    }
-    return { startMs, endMs: todayMs, ticks: thin(dedupSort(raw), 6) };
+    const ticks = Array.from({ length: 7 }, (_, i) => {
+      const ms = startMs + i * 5 * DAY;
+      return tick(ms, labelDM(ms));
+    });
+    return { startMs, endMs: todayMs, ticks };
   }
 
-  // Wszystko — oś znaczona wyłącznie kolejnymi miesiącami (etykieta na środku pasma
-  // danego miesiąca, bez dni → czytelnie i bez tłoku, niezależnie od rozpiętości).
-  const msList = entries.map(e => dateStrToMs(e.entryDate));
-  const minMs = msList.length ? Math.min(...msList) : todayMs - 6 * DAY;
-  const maxMs = Math.max(...msList, todayMs);
+  // Wszystko — okno 12 miesięcy kończące się w windowEnd (domyślnie dziś), przewijane.
+  // Każdy miesiąc = jeden tick (etykieta na środku pasma miesiąca); rok dopisany przy
+  // styczniu oraz pierwszym widocznym miesiącu.
+  const { spanStart, spanEnd, minEnd, maxEnd } = allRangeBounds(entries);
+  const end = clampMs(windowEndMs ?? spanEnd, minEnd, maxEnd);
+  let winStart = addMonths(end, -WINDOW_MONTHS);
+  if (winStart < spanStart) winStart = spanStart; // mniej danych niż rok → nie schodź poniżej
+
   const ticks = [];
-  const start = new Date(minMs);
-  let cur = new Date(start.getFullYear(), start.getMonth(), 1, 12); // 1. miesiąca startu
-  while (cur.getTime() <= maxMs) {
-    const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1, 12);
-    const mid = (Math.max(cur.getTime(), minMs) + Math.min(next.getTime(), maxMs)) / 2;
-    // Rok dopisany przy styczniu albo pierwszym ticku — reszta sam miesiąc.
-    const label = cur.getMonth() === 0 || ticks.length === 0 ? labelMY(cur.getTime()) : MONTHS_PL[cur.getMonth()];
+  let cur = firstOfMonth(winStart);
+  while (cur <= end) {
+    const next = addMonths(cur, 1);
+    const mid = (Math.max(cur, winStart) + Math.min(next, end)) / 2;
+    const d = new Date(cur);
+    const label = d.getMonth() === 0 || ticks.length === 0 ? labelMY(cur) : MONTHS_PL[d.getMonth()];
     ticks.push(tick(mid, label));
     cur = next;
   }
 
-  return { startMs: minMs, endMs: maxMs, ticks };
+  return { startMs: winStart, endMs: end, ticks };
 }
