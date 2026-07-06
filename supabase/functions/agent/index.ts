@@ -4,8 +4,9 @@
 // Persona, metryki, narzędzie get_entries i wywołanie xAI są współdzielone z funkcją `api`.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
-  CORS,
-  json,
+  corsHeaders,
+  jsonWith,
+  isValidDate,
   formatEntry,
   PERSONA,
   XAI_API_KEY,
@@ -20,7 +21,9 @@ const SUMMARY_INSTRUCTION = `Tryb: ANALIZA LOGANA (rozbudowane podsumowanie dnia
 WAŻNE — format odpowiedzi: pierwsza linia to dokładnie "SKRÓT: " + jedno zwięzłe zdanie (max ~140 znaków) podsumowujące najważniejszy wniosek; potem pusta linia; potem pełna, rozbudowana analiza.`;
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  const cors = corsHeaders(req);
+  const json = jsonWith(cors);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (!XAI_API_KEY) return json({ error: "Brak konfiguracji XAI_API_KEY" }, 500);
 
@@ -43,7 +46,7 @@ Deno.serve(async (req) => {
   const entryDate = body.entryDate;
   const mode = body.mode === "summary" ? "summary" : "chat";
   const history = Array.isArray(body.history) ? body.history : [];
-  if (!entryDate) return json({ error: "Brak entryDate" }, 400);
+  if (!isValidDate(entryDate)) return json({ error: "Nieprawidłowa data (oczekiwano YYYY-MM-DD)" }, 400);
 
   // Rate limit — klient JWT, więc user_id wyznacza RPC z auth.uid(). Wspólny licznik z /ask.
   const limited = await enforceRateLimit(supabase);
@@ -197,6 +200,6 @@ Deno.serve(async (req) => {
 
   return new Response(stream, {
     status: 200,
-    headers: { ...CORS, "Content-Type": "text/plain; charset=utf-8" },
+    headers: { ...cors, "Content-Type": "text/plain; charset=utf-8" },
   });
 });

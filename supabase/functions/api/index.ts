@@ -10,6 +10,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   CORS,
   json,
+  isValidDate,
   METRICS,
   formatEntry,
   PERSONA,
@@ -30,8 +31,6 @@ const admin = createClient(
 
 // „Dziś" w strefie Europe/Warsaw — spójnie z aplikacją i domyślną wartością entry_date w bazie.
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw" }).format(new Date());
-const isValidDate = (s: unknown): s is string =>
-  typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
 const isValidMetric = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 100;
 

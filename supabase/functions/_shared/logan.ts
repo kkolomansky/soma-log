@@ -19,6 +19,8 @@ export const LOGAN_DAILY_LIMIT = Number(Deno.env.get("LOGAN_DAILY_LIMIT") ?? "10
 export const HYBRID_MATCH_COUNT = Number(Deno.env.get("HYBRID_MATCH_COUNT") ?? "30");
 export const HYBRID_RECENT_DAYS = Number(Deno.env.get("HYBRID_RECENT_DAYS") ?? "7");
 
+// CORS permisywny (Origin: *) — używany przez PUBLICZNE, tokenowe API (`api`), gdzie dostęp
+// cross-origin z przeglądarki jest zamierzony, a endpoint i tak chroni token (nie ciasteczka).
 export const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -31,6 +33,38 @@ export const json = (body: unknown, status = 200) =>
     status,
     headers: { ...CORS, "Content-Type": "application/json" },
   });
+
+// Allowlista origin dla funkcji obsługujących aplikację (agent, tokens, tts, transcribe).
+// Konfigurowalna sekretem `APP_ORIGINS` (CSV); domyślnie domena prod + Vite dev.
+const APP_ORIGINS = (Deno.env.get("APP_ORIGINS") ??
+  "https://soma-log-umber.vercel.app,http://localhost:5173")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+
+// Nagłówki CORS z zawężeniem do allowlisty. Echo origin gdy dozwolony, inaczej pierwszy z listy
+// (przeglądarka i tak zablokuje niepasujący origin). Wymaga `req`, bo zależy od nagłówka Origin.
+export function corsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") ?? "";
+  const allow = APP_ORIGINS.includes(origin) ? origin : APP_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  };
+}
+
+// Fabryka odpowiedzi JSON związana z konkretnym zestawem nagłówków CORS (per żądanie).
+export function jsonWith(cors: Record<string, string>) {
+  return (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+}
+
+// Walidacja daty w formacie YYYY-MM-DD (współdzielona przez `api` i `agent`).
+export const isValidDate = (s: unknown): s is string =>
+  typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
 
 export const METRICS = [
   { key: "sleep", label: "Sen", higherBetter: true },

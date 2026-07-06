@@ -1,21 +1,12 @@
 // Transkrypcja głosowa SomaLog — przekazuje nagranie do xAI Grok STT (/v1/stt).
+import { corsHeaders, jsonWith } from "../_shared/logan.ts";
+
 const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
 const XAI_STT_URL = "https://api.x.ai/v1/stt";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS, "Content-Type": "application/json" },
-  });
-
 Deno.serve(async (req) => {
+  const CORS = corsHeaders(req);
+  const json = jsonWith(CORS);
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (!XAI_API_KEY) return json({ error: "Brak konfiguracji XAI_API_KEY" }, 500);
