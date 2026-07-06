@@ -5,18 +5,7 @@
 //   GET               → lista własnych tokenów (metadane, bez plaintextu)
 //   DELETE { id }     → odwołaj (usuń) token
 import { createClient } from "jsr:@supabase/supabase-js@2";
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-};
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS, "Content-Type": "application/json" },
-  });
+import { corsHeaders, jsonWith } from "../_shared/logan.ts";
 
 async function sha256Hex(s: string) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -26,7 +15,8 @@ async function sha256Hex(s: string) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  const json = jsonWith(corsHeaders(req));
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
 
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader) return json({ error: "Brak autoryzacji" }, 401);
