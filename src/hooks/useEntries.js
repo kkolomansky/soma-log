@@ -15,6 +15,7 @@ function fromRow(row) {
     doms: row.doms,
     stress: row.stress,
     note: row.note ?? '',
+    photos: Array.isArray(row.photos) ? row.photos : [], // ścieżki zdjęć w Storage (soma-photos)
     aiSummary: row.ai_summary ?? '',         // pełna analiza Logana
     aiSummaryShort: row.ai_summary_short ?? '', // krótki wyciąg (obok zegara)
   };
@@ -64,11 +65,11 @@ export function useEntries(userId) {
   // tworzyć duplikat. updated_at jest aktualizowany triggerem w bazie.
   const saveEntry = useCallback(async (dateStr, entry) => {
     if (!userId) return null;
-    const { sleep, energy, motivation, fatigue, doms, stress, note } = entry;
+    const { sleep, energy, motivation, fatigue, doms, stress, note, photos } = entry;
     const { data, error } = await supabase
       .from(ENTRIES_TABLE)
       .upsert(
-        { user_id: userId, entry_date: dateStr, sleep, energy, motivation, fatigue, doms, stress, note: note ?? '' },
+        { user_id: userId, entry_date: dateStr, sleep, energy, motivation, fatigue, doms, stress, note: note ?? '', photos: photos ?? [] },
         { onConflict: 'user_id,entry_date' }
       )
       .select()

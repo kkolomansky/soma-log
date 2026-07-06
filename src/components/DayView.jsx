@@ -7,7 +7,10 @@ import MicButton from './MicButton';
 import { useAutoGrow } from '../hooks/useAutoGrow';
 import { calcScore, scoreLabel } from '../utils/recoveryScore';
 import { METRICS } from '../utils/metrics';
-import { GaugeIcon, TrendsIcon, NoteIcon } from './icons';
+import { GaugeIcon, TrendsIcon, NoteIcon, PhotoPlusIcon } from './icons';
+import { uploadPhoto, removePhotos, signedUrls } from '../lib/photos';
+import PhotoFrame from './PhotoFrame';
+import ConfirmModal from './ConfirmModal';
 
 function CloseIcon({ size = 16 }) {
   return (
@@ -29,22 +32,70 @@ function PencilIcon({ size = 15 }) {
   );
 }
 
-// Edytowalna notatka dnia. Mikrofon na wysokości etykiety (prawa); dyktowanie dopisuje tekst.
-// Tekst rośnie do 5 wierszy, potem wewnętrzny scroll (nie nachodzi na mikrofon w nagłówku).
-function NoteCard({ note, onSave }) {
+// Edytowalna notatka dnia. Zdjęcia (oryginalna rozdzielczość, wyśrodkowane) między
+// nagłówkiem a tekstem; „+" dodaje zdjęcie bezpośrednio w notatce, mikrofon dyktuje tekst.
+// Tekst rośnie do 5 wierszy, potem wewnętrzny scroll.
+function NoteCard({ note, photos, userId, onSave }) {
   const [draft, setDraft] = useState(note ?? '');
+  const [localPhotos, setLocalPhotos] = useState(photos ?? []);
+  const [urls, setUrls] = useState({}); // ścieżka → signed URL
+  const [confirmRemovePath, setConfirmRemovePath] = useState(null);
+  const [photoError, setPhotoError] = useState(null);
   const taRef = useRef(null);
+  const fileInputRef = useRef(null);
   useEffect(() => { setDraft(note ?? ''); }, [note]);
+  useEffect(() => { setLocalPhotos(photos ?? []); }, [photos]);
   useAutoGrow(taRef, draft, 5);
 
+  // Signed URLs do podglądu (prywatny bucket) — odświeżane przy zmianie listy zdjęć.
+  useEffect(() => {
+    let cancelled = false;
+    if (localPhotos.length === 0) { setUrls({}); return; }
+    signedUrls(localPhotos)
+      .then(list => {
+        if (cancelled) return;
+        const map = {};
+        for (const { path, url } of list) map[path] = url;
+        setUrls(map);
+      })
+      .catch(() => { if (!cancelled) setUrls({}); });
+    return () => { cancelled = true; };
+  }, [localPhotos]);
+
   const handleBlur = () => {
-    if (draft.trim() !== (note ?? '').trim()) onSave(draft.trim());
+    if (draft.trim() !== (note ?? '').trim()) onSave({ note: draft.trim(), photos: localPhotos });
   };
 
   // Dyktowanie na żywo: aktualizuj pole na bieżąco, zapisz po zakończeniu (isFinal).
   const onVoice = (joined, isFinal) => {
     setDraft(joined);
-    if (isFinal) onSave(joined.trim());
+    if (isFinal) onSave({ note: joined.trim(), photos: localPhotos });
+  };
+
+  const handleFilePick = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (files.length === 0) return;
+    setPhotoError(null);
+    try {
+      const uploaded = [];
+      for (const file of files) uploaded.push(await uploadPhoto(userId, file));
+      const next = [...localPhotos, ...uploaded];
+      setLocalPhotos(next);
+      onSave({ note: draft.trim(), photos: next });
+    } catch (err) {
+      setPhotoError(err?.message || 'Nie udało się dodać zdjęcia.');
+    }
+  };
+
+  const confirmRemove = () => {
+    const path = confirmRemovePath;
+    setConfirmRemovePath(null);
+    if (!path) return;
+    const next = localPhotos.filter(p => p !== path);
+    setLocalPhotos(next);
+    onSave({ note: draft.trim(), photos: next });
+    removePhotos([path]).catch(() => {}); // sprzątanie Storage nie może blokować UI
   };
 
   return (
@@ -54,8 +105,32 @@ function NoteCard({ note, onSave }) {
           <span className="text-[#0E7490]"><NoteIcon size={14} /></span>
           Notatka
         </p>
-        <MicButton getText={() => draft} onText={onVoice} size={28} iconSize={15} />
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Dodaj zdjęcie"
+            title="Dodaj zdjęcie"
+            style={{ width: 28, height: 28 }}
+            className="rounded-full flex items-center justify-center shrink-0 bg-elevated text-txt-3 hover:text-txt transition-colors"
+          >
+            <PhotoPlusIcon size={15} />
+          </button>
+          <MicButton getText={() => draft} onText={onVoice} size={28} iconSize={15} />
+        </div>
       </div>
+
+      <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFilePick} className="hidden" />
+
+      {localPhotos.length > 0 && (
+        <div className="flex flex-col items-center gap-2 mb-3">
+          {localPhotos.map(path => (
+            <PhotoFrame key={path} src={urls[path]} onRemove={() => setConfirmRemovePath(path)} />
+          ))}
+        </div>
+      )}
+      {photoError && <p className="text-danger text-xs mb-2">{photoError}</p>}
+
       <textarea
         ref={taRef}
         value={draft}
@@ -65,45 +140,14 @@ function NoteCard({ note, onSave }) {
         placeholder="Zapisz notatkę lub podyktuj ją głosem…"
         className="w-full bg-transparent text-txt-2 placeholder-txt-3 text-[11px] resize-none outline-none leading-relaxed pr-2 md:text-justify"
       />
-    </div>
-  );
-}
 
-// Modal potwierdzenia usunięcia — ten sam ciemny design co reszta aplikacji.
-function ConfirmDeleteModal({ open, onCancel, onConfirm }) {
-  return (
-    <>
-      <div
-        className={`fixed inset-0 bg-black/60 z-[60] transition-opacity duration-200 ${
-          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onCancel}
+      <ConfirmModal
+        open={!!confirmRemovePath}
+        title="Czy na pewno chcesz usunąć to zdjęcie?"
+        onCancel={() => setConfirmRemovePath(null)}
+        onConfirm={confirmRemove}
       />
-      <div className={`fixed inset-0 z-[70] flex items-center justify-center px-6 ${open ? 'pointer-events-auto' : 'pointer-events-none'}`}>
-        <div
-          className={`w-full max-w-xs bg-elevated border border-border rounded-2xl p-5 transition-[transform,opacity] duration-200 ${
-            open ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
-          }`}
-        >
-          <p className="text-txt font-display font-semibold text-base text-center">Usunąć wpis?</p>
-          <p className="text-txt-3 text-sm text-center mt-1.5">Czy na pewno chcesz usunąć ten wpis? Tej operacji nie można cofnąć.</p>
-          <div className="flex gap-2 mt-5">
-            <button
-              onClick={onCancel}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-border text-txt-2 hover:bg-surface transition-colors"
-            >
-              Anuluj
-            </button>
-            <button
-              onClick={onConfirm}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:opacity-90 transition-opacity"
-            >
-              Usuń
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -142,7 +186,7 @@ function SectionTabs({ tab, onChange, children }) {
   );
 }
 
-export default function DayView({ entry, days, selectedDate, entries, onSelect, onAddClick, onDelete, onSaveNote, onAnalyze }) {
+export default function DayView({ entry, days, selectedDate, entries, userId, onSelect, onAddClick, onDelete, onSaveNote, onAnalyze }) {
   const [tab, setTab] = useState('wskazniki');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -298,7 +342,7 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
 
       {tab === 'wskazniki' && (
         <>
-          <NoteCard key={entry.id} note={entry.note} onSave={onSaveNote} />
+          <NoteCard key={entry.id} note={entry.note} photos={entry.photos} userId={userId} onSave={onSaveNote} />
           <AiSummaryCard
             summary={entry.aiSummary}
             onAnalyze={runAnalyze}
@@ -309,8 +353,10 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
         </>
       )}
 
-      <ConfirmDeleteModal
+      <ConfirmModal
         open={confirmingDelete}
+        title="Usunąć wpis?"
+        message="Czy na pewno chcesz usunąć ten wpis? Tej operacji nie można cofnąć."
         onCancel={() => setConfirmingDelete(false)}
         onConfirm={() => { setConfirmingDelete(false); onDelete(entry.id); }}
       />
