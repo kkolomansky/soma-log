@@ -52,17 +52,34 @@ export function useChat(userId, entryDate) {
       setMessages(prev => prev.map(m => (m.id === optimistic.id ? savedUser : m)));
     }
 
-    // 2. Odpowiedź agenta → zapis.
+    // 2. Odpowiedź agenta — strumieniowo (słowo po słowie) → dopiero po zakończeniu zapis.
+    const streamId = `stream-${Date.now()}`;
+    let started = false;
     try {
-      const reply = await chatWithAgent({ entryDate, history });
+      const reply = await chatWithAgent({ entryDate, history }, (partial) => {
+        setMessages(prev => {
+          if (!started) {
+            started = true;
+            return [...prev, { id: streamId, role: 'assistant', content: partial }];
+          }
+          return prev.map(m => (m.id === streamId ? { ...m, content: partial } : m));
+        });
+      });
       const { data: savedAssistant } = await supabase
         .from(CHAT_TABLE)
         .insert({ user_id: userId, entry_date: entryDate, role: 'assistant', content: reply })
         .select('id, role, content, created_at')
         .single();
-      setMessages(prev => [...prev, savedAssistant ?? { id: `a-${Date.now()}`, role: 'assistant', content: reply }]);
+      // Podmień tymczasowy strumień na rekord z bazy (stabilne id + created_at).
+      setMessages(prev => {
+        const fallback = { id: streamId, role: 'assistant', content: reply };
+        if (started) return prev.map(m => (m.id === streamId ? (savedAssistant ?? fallback) : m));
+        return [...prev, savedAssistant ?? fallback];
+      });
     } catch (e) {
       setError(e.message);
+      // Usuń niedokończony strumień, by nie zostawiać pustej bańki.
+      if (started) setMessages(prev => prev.filter(m => m.id !== streamId));
     } finally {
       setSending(false);
     }

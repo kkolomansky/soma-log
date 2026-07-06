@@ -146,6 +146,25 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
   const [tab, setTab] = useState('wskazniki');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  // Analiza Logana zarządzana tu, by wyciąg i pełne podsumowanie „pisały się" razem
+  // z jednego kliknięcia (wspólny stan ładowania + licznik odtworzenia animacji).
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState(null);
+  const [summaryPlay, setSummaryPlay] = useState(0);
+  const runAnalyze = async () => {
+    if (analyzing) return;
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    try {
+      await onAnalyze();
+      setSummaryPlay(k => k + 1);
+    } catch (e) {
+      setAnalyzeError(e.message || 'Nie udało się wygenerować analizy.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   // Widok webowy (md+) → zegar i Podsumowanie Logana dzielą okno wskaźników po równo.
   const [isWide, setIsWide] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
@@ -244,7 +263,13 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
                 </p>
               </div>
               <div className="flex-1 min-w-0">
-                <LoganExcerpt short={entry.aiSummaryShort} onAnalyze={onAnalyze} />
+                <LoganExcerpt
+                  short={entry.aiSummaryShort}
+                  onAnalyze={runAnalyze}
+                  loading={analyzing}
+                  error={analyzeError}
+                  playKey={summaryPlay}
+                />
               </div>
             </div>
 
@@ -274,7 +299,13 @@ export default function DayView({ entry, days, selectedDate, entries, onSelect, 
       {tab === 'wskazniki' && (
         <>
           <NoteCard key={entry.id} note={entry.note} onSave={onSaveNote} />
-          <AiSummaryCard summary={entry.aiSummary} onAnalyze={onAnalyze} />
+          <AiSummaryCard
+            summary={entry.aiSummary}
+            onAnalyze={runAnalyze}
+            loading={analyzing}
+            error={analyzeError}
+            playKey={summaryPlay}
+          />
         </>
       )}
 

@@ -18,6 +18,23 @@ export function buildLast30Days() {
   return days; // oldest first → today last
 }
 
+// Lista dni 'YYYY-MM-DD' od startStr do endStr włącznie (oldest first).
+// Bezpiecznik na wypadek odwróconych/nieprawidłowych dat i bardzo długich zakresów.
+export function buildDayRange(startStr, endStr) {
+  const start = new Date(startStr + 'T12:00:00');
+  const end = new Date(endStr + 'T12:00:00');
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return [];
+  const days = [];
+  const d = new Date(start);
+  let guard = 0;
+  while (d <= end && guard < 3660) { // ~10 lat max
+    days.push(toDateString(d));
+    d.setDate(d.getDate() + 1);
+    guard++;
+  }
+  return days;
+}
+
 export function formatPill(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
   return {

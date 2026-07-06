@@ -20,6 +20,13 @@ export default function TrendChart({ entries, startMs, endMs, ticks }) {
       .map((e, i) => `${i === 0 ? 'M' : 'L'} ${xPos(dateStrToMs(e.entryDate)).toFixed(1)} ${yPos(e[key]).toFixed(1)}`)
       .join(' ');
 
+  // Linie 30% cieńsze; znaczniki znacznie mniejsze i malejące z gęstością wpisów,
+  // aż do ukrycia przy bardzo dużej liczbie punktów (czytelność „Wszystko").
+  const LINE_W = 1.0;                 // było 1.4 → −30%
+  const n = sorted.length;
+  const dotR = n > 90 ? 0 : n > 45 ? 1.1 : 1.5;
+  const dotStroke = 0.5;
+
   // Etykiety osi (30% mniejsze niż dotychczas).
   const AXIS_FONT = 6.3;
   // Anty-nakładanie etykiet X: priorytet dla skrajnych (pierwsza/dziś), reszta tylko gdy się mieści.
@@ -57,19 +64,19 @@ export default function TrendChart({ entries, startMs, endMs, ticks }) {
               d={makePath(m.key)}
               fill="none"
               stroke={m.color}
-              strokeWidth="1.4"
+              strokeWidth={LINE_W}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            {sorted.map((e, i) => (
+            {dotR > 0 && sorted.map((e, i) => (
               <circle
                 key={i}
                 cx={xPos(dateStrToMs(e.entryDate)).toFixed(1)}
                 cy={yPos(e[m.key]).toFixed(1)}
-                r="2.4"
+                r={dotR}
                 fill={m.color}
                 stroke="#151A18"
-                strokeWidth="1"
+                strokeWidth={dotStroke}
               />
             ))}
           </g>
