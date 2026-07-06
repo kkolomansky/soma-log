@@ -87,7 +87,17 @@ export default function Trends({ entries }) {
       <div className="flex items-center gap-2 mb-3">
         <span className="text-recovery"><TrendsIcon size={16} /></span>
         <p className="text-txt-2 text-xs font-display font-semibold uppercase tracking-wide">Trendy w czasie</p>
-        <span className="text-txt-3 text-xs font-mono ml-auto">{filtered.length} wpisów</span>
+        {isAll ? (
+          <span className="ml-auto flex items-baseline gap-1.5 font-mono text-xs">
+            <span className="text-txt-2">{filtered.length}</span>
+            <span className="text-txt-3">w okresie</span>
+            <span className="text-txt-3">·</span>
+            <span className="text-txt-2">{entries.length}</span>
+            <span className="text-txt-3">łącznie</span>
+          </span>
+        ) : (
+          <span className="text-txt-3 text-xs font-mono ml-auto">{filtered.length} wpisów</span>
+        )}
       </div>
 
       {/* Przełącznik zakresu */}
