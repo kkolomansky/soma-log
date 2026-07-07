@@ -1,10 +1,16 @@
 // Pojedyncze zdjęcie w oryginalnej rozdzielczości, wyśrodkowane, z przyciskiem usunięcia (✕).
-// src=null → placeholder (trwa pobieranie signed URL). onRemove=null → tryko podgląd.
-export default function PhotoFrame({ src, onRemove }) {
+// src=null → placeholder (trwa pobieranie signed URL). onRemove=null → tylko podgląd.
+// onOpen → klik w zdjęcie otwiera pełnoekranową galerię.
+export default function PhotoFrame({ src, onRemove, onOpen }) {
   return (
     <div className="relative inline-block max-w-full">
       {src ? (
-        <img src={src} alt="" className="max-w-full h-auto rounded-xl border border-border" />
+        <img
+          src={src}
+          alt=""
+          onClick={onOpen}
+          className={`max-w-full h-auto rounded-xl border border-border ${onOpen ? 'cursor-zoom-in' : ''}`}
+        />
       ) : (
         <div className="w-40 h-40 rounded-xl border border-border bg-elevated animate-pulse" />
       )}

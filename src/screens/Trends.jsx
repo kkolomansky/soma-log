@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import TrendChart from '../components/TrendChart';
+import TrendLandscapeModal from '../components/TrendLandscapeModal';
 import { TrendsIcon } from '../components/icons';
 import { buildTimeAxis, allRangeBounds, dateStrToMs } from '../utils/trendAxis';
 import { MONTHS_PL } from '../utils/dateUtils';
@@ -26,8 +27,22 @@ export default function Trends({ entries }) {
   const [rangeIdx, setRangeIdx] = useState(2);
   // Koniec widocznego 12-mies. okna dla „Wszystko" (null = najnowsze, czyli dziś).
   const [windowEnd, setWindowEnd] = useState(null);
+  const [landscape, setLandscape] = useState(false); // powiększony podgląd (mobile: poziomo / web: pionowo)
   const wrapRef = useRef(null);
   const dragRef = useRef(null);
+  const modalDragRef = useRef(null); // panning wewnątrz powiększonego modala
+  const tapRef = useRef(null); // wykrycie „tap" (bez przeciągnięcia) → otwarcie powiększenia
+
+  // Widok mobilny → kliknięcie wykresu otwiera go w poziomie (czytelniejsze osie/dane).
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = e => setIsMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   const days = RANGES[rangeIdx].days;
   const isAll = days === null;
@@ -52,14 +67,20 @@ export default function Trends({ entries }) {
     return clampMs(next, bounds.minEnd, bounds.maxEnd);
   });
 
-  // Przeciąganie myszą/palcem: dx px → przesunięcie okna w czasie (w prawo = wstecz).
+  // Gest na obszarze wykresu jest „przechwytywany" (stopPropagation), więc NIE przełącza
+  // dnia — zmiana dnia możliwa tylko poza wykresem (patrz DayView). Przy „Wszystko" gest
+  // panoramuje wykres; krótki tap (bez ruchu) na mobile otwiera widok poziomy.
   const onPointerDown = (e) => {
+    e.stopPropagation();
+    tapRef.current = { x: e.clientX, y: e.clientY, moved: false };
     if (!canPan) return;
     const plotW = (wrapRef.current?.clientWidth ?? 320) * (324 / 360); // szer. pola wykresu
     dragRef.current = { startX: e.clientX, startEnd: effEnd, span: axis.endMs - axis.startMs, plotW };
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* brak aktywnego wskaźnika */ }
   };
   const onPointerMove = (e) => {
+    const tap = tapRef.current;
+    if (tap && (Math.abs(e.clientX - tap.x) > 8 || Math.abs(e.clientY - tap.y) > 8)) tap.moved = true;
     const d = dragRef.current;
     if (!d) return;
     const dx = e.clientX - d.startX;
@@ -67,10 +88,33 @@ export default function Trends({ entries }) {
     setWindowEnd(clampMs(d.startEnd + deltaMs, bounds.minEnd, bounds.maxEnd));
   };
   const endDrag = (e) => {
-    if (!dragRef.current) return;
-    dragRef.current = null;
-    e.currentTarget?.releasePointerCapture?.(e.pointerId);
+    const tap = tapRef.current;
+    tapRef.current = null;
+    if (dragRef.current) { dragRef.current = null; try { e.currentTarget?.releasePointerCapture?.(e.pointerId); } catch { /* nie przechwycono */ } }
+    // Tap (bez przeciągnięcia) → powiększony widok wykresu (mobile: poziomo, web: pionowo).
+    if (tap && !tap.moved) setLandscape(true);
   };
+  // Zablokuj też natywny gest dotykowy przed dotarciem do przełącznika dni (DayView).
+  const stopTouch = (e) => e.stopPropagation();
+
+  // Uchwyty panningu dla powiększonego modala (współdzielą stan `windowEnd`, więc po
+  // zamknięciu widok pozostaje zsynchronizowany). `rotated` → w obróconym 90° oknie
+  // lokalna oś czasu = ekranowe Y, więc panujemy po clientY.
+  const makePan = (rotated) => ({
+    onPointerDown: (e) => {
+      if (!canPan) return;
+      const plotW = (e.currentTarget.clientWidth || 320) * (324 / 360);
+      modalDragRef.current = { start: rotated ? e.clientY : e.clientX, startEnd: effEnd, span: axis.endMs - axis.startMs, plotW };
+      try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* brak wskaźnika */ }
+    },
+    onPointerMove: (e) => {
+      const d = modalDragRef.current; if (!d) return;
+      const delta = (rotated ? e.clientY : e.clientX) - d.start;
+      setWindowEnd(clampMs(d.startEnd - (delta / d.plotW) * d.span, bounds.minEnd, bounds.maxEnd));
+    },
+    onPointerUp: (e) => { if (modalDragRef.current) { modalDragRef.current = null; try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* noop */ } } },
+    onPointerCancel: () => { modalDragRef.current = null; },
+  });
 
   if (entries.length === 0) {
     return (
@@ -84,11 +128,11 @@ export default function Trends({ entries }) {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-recovery"><TrendsIcon size={16} /></span>
-        <p className="text-txt-2 text-xs font-display font-semibold uppercase tracking-wide">Trendy w czasie</p>
+      <div className="flex items-center gap-2 mb-3 flex-nowrap">
+        <span className="text-recovery shrink-0"><TrendsIcon size={16} /></span>
+        <p className="text-txt-2 text-xs font-display font-semibold uppercase tracking-wide whitespace-nowrap truncate">Trendy w czasie</p>
         {isAll ? (
-          <span className="ml-auto flex items-baseline gap-1.5 font-mono text-xs">
+          <span className="ml-auto flex items-baseline gap-1.5 font-mono text-xs whitespace-nowrap shrink-0">
             <span className="text-txt-2">{filtered.length}</span>
             <span className="text-txt-3">w okresie</span>
             <span className="text-txt-3">·</span>
@@ -96,7 +140,7 @@ export default function Trends({ entries }) {
             <span className="text-txt-3">łącznie</span>
           </span>
         ) : (
-          <span className="text-txt-3 text-xs font-mono ml-auto">{filtered.length} wpisów</span>
+          <span className="text-txt-3 text-xs font-mono ml-auto whitespace-nowrap shrink-0">{filtered.length} wpisów</span>
         )}
       </div>
 
@@ -151,11 +195,24 @@ export default function Trends({ entries }) {
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          className={canPan ? 'cursor-grab active:cursor-grabbing touch-pan-y' : ''}
+          onTouchStart={stopTouch}
+          className={`touch-pan-y select-none ${canPan ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
         >
           <TrendChart entries={filtered} startMs={axis.startMs} endMs={axis.endMs} ticks={axis.ticks} />
         </div>
       )}
+
+      <TrendLandscapeModal
+        open={landscape}
+        onClose={() => setLandscape(false)}
+        rotate={isMobile}
+        canPan={canPan}
+        panHandlers={makePan(isMobile)}
+        entries={filtered}
+        startMs={axis.startMs}
+        endMs={axis.endMs}
+        ticks={axis.ticks}
+      />
     </div>
   );
 }

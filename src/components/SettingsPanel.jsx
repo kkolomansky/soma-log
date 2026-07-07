@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import SpeakButton from './SpeakButton';
-import { UserIcon, SpeakerIcon, KeyIcon, GaugeIcon } from './icons';
+import ConfirmModal from './ConfirmModal';
+import { UserIcon, SpeakerIcon, KeyIcon, GaugeIcon, MailIcon, LockIcon, TextSizeIcon, TrashIcon, LogoutIcon } from './icons';
 import { VOICES, SAMPLE_TEXT, getVoice, setVoice, saveVoiceToServer } from '../lib/voice';
 import { listTokens, createToken, revokeToken, API_BASE } from '../lib/apiTokens';
 import { getUsageToday, LOGAN_DAILY_LIMIT } from '../lib/usage';
+import { FONT_SCALES, getFontScale, setFontScale } from '../lib/fontScale';
+import { displayName, updateUsername, updateEmail, changePassword, deleteAccount } from '../lib/account';
 
 function CloseIcon({ size = 18 }) {
   return (
@@ -265,48 +268,265 @@ function UsagePanel() {
   );
 }
 
-// Lista pozycji menu panelu.
-function SettingsMenu({ onOpenVoice, onOpenTokens, onOpenUsage }) {
-  const items = [
-    { id: 'voice', label: 'Głos Logana', desc: 'Wybór lektora odczytu analizy', Icon: SpeakerIcon, onClick: onOpenVoice },
-    { id: 'tokens', label: 'Tokeny API', desc: 'Sterowanie aplikacją spoza SomaLog', Icon: KeyIcon, onClick: onOpenTokens },
-    { id: 'usage', label: 'Limity zapytań', desc: 'Dzienne zużycie limitu Logana', Icon: GaugeIcon, onClick: onOpenUsage },
-  ];
+// Pojedyncze pole edycji z przyciskiem zapisu i komunikatem o wyniku.
+function EditField({ label, type = 'text', initial = '', placeholder, autoComplete, saveLabel = 'Zapisz', hint, onSave, validate }) {
+  const [value, setValue] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null); // { ok: bool, text }
+  useEffect(() => { setValue(initial); }, [initial]);
+
+  const submit = async () => {
+    if (busy) return;
+    const err = validate ? validate(value) : null;
+    if (err) { setMsg({ ok: false, text: err }); return; }
+    setBusy(true); setMsg(null);
+    try { await onSave(value); setMsg({ ok: true, text: 'Zapisano.' }); }
+    catch (e) { setMsg({ ok: false, text: e.message || 'Nie udało się zapisać.' }); }
+    finally { setBusy(false); }
+  };
+
   return (
-    <div className="flex flex-col gap-1.5">
-      {items.map(({ id, label, desc, Icon, onClick }) => (
+    <div className="mb-3">
+      <label className="block text-txt-3 text-[11px] font-medium mb-1">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          type={type}
+          value={value}
+          onChange={e => { setValue(e.target.value); setMsg(null); }}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          className="flex-1 min-w-0 rounded-xl border border-border bg-surface px-3 py-2 text-txt text-sm outline-none focus:border-recovery/60 transition-colors"
+        />
         <button
-          key={id}
-          onClick={onClick}
-          className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left hover:bg-elevated transition-colors"
+          onClick={submit}
+          disabled={busy}
+          className="shrink-0 rounded-xl bg-recovery/90 hover:bg-recovery text-bg text-xs font-medium px-3 py-2 transition-colors disabled:opacity-50"
         >
-          <span className="shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-elevated text-txt-2">
-            <Icon size={18} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-txt text-sm font-medium leading-tight">{label}</span>
-            <span className="block text-txt-3 text-[11px] leading-tight truncate">{desc}</span>
-          </span>
-          <span className="shrink-0 text-txt-3"><ChevronRightIcon size={16} /></span>
+          {busy ? '…' : saveLabel}
         </button>
-      ))}
+      </div>
+      {hint && !msg && <p className="text-txt-3 text-[10px] leading-snug mt-1">{hint}</p>}
+      {msg && <p className={`text-[10px] leading-snug mt-1 ${msg.ok ? 'text-recovery' : 'text-danger'}`}>{msg.text}</p>}
     </div>
   );
 }
 
-// Panel użytkownika — menu ustawień. Pozycje (na razie „Głos Logana") wchodzą w podwidoki.
-export default function SettingsPanel({ open, onClose, initialView = 'menu', email }) {
-  const [view, setView] = useState('menu'); // 'menu' | 'voice' | 'tokens' | 'usage'
+// Zmiana hasła: obecne + nowe + powtórzenie nowego (z weryfikacją obecnego hasła).
+function ChangePasswordForm() {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [repeat, setRepeat] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null); // { ok, text }
+
+  const submit = async () => {
+    if (busy) return;
+    if (next.length < 6) { setMsg({ ok: false, text: 'Nowe hasło musi mieć co najmniej 6 znaków.' }); return; }
+    if (next !== repeat) { setMsg({ ok: false, text: 'Nowe hasła nie są takie same.' }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      await changePassword(current, next);
+      setMsg({ ok: true, text: 'Hasło zmienione.' });
+      setCurrent(''); setNext(''); setRepeat('');
+    } catch (e) {
+      setMsg({ ok: false, text: e.message || 'Nie udało się zmienić hasła.' });
+    } finally { setBusy(false); }
+  };
+
+  const field = 'w-full rounded-xl border border-border bg-surface px-3 py-2 text-txt text-sm outline-none focus:border-recovery/60 transition-colors';
+
+  return (
+    <div className="mb-3">
+      <label className="block text-txt-3 text-[11px] font-medium mb-1">Zmiana hasła</label>
+      <div className="flex flex-col gap-2">
+        <input type="password" value={current} autoComplete="current-password" placeholder="Obecne hasło"
+          onChange={e => { setCurrent(e.target.value); setMsg(null); }} className={field} />
+        <input type="password" value={next} autoComplete="new-password" placeholder="Nowe hasło"
+          onChange={e => { setNext(e.target.value); setMsg(null); }} className={field} />
+        <input type="password" value={repeat} autoComplete="new-password" placeholder="Powtórz nowe hasło"
+          onChange={e => { setRepeat(e.target.value); setMsg(null); }} className={field} />
+        <button onClick={submit} disabled={busy}
+          className="self-end rounded-xl bg-recovery/90 hover:bg-recovery text-bg text-xs font-medium px-3 py-2 transition-colors disabled:opacity-50">
+          {busy ? '…' : 'Zmień hasło'}
+        </button>
+      </div>
+      {msg && <p className={`text-[10px] leading-snug mt-1 ${msg.ok ? 'text-recovery' : 'text-danger'}`}>{msg.text}</p>}
+    </div>
+  );
+}
+
+// Widok „Konto": nazwa użytkownika, e-mail, hasło, wylogowanie + usunięcie konta.
+function AccountPanel({ user, onSignOut }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+
+  const runDelete = async () => {
+    setDeleting(true); setDeleteError(null);
+    try { await deleteAccount(); /* wylogowanie → App pokaże ekran logowania */ }
+    catch (e) { setDeleteError(e.message); setDeleting(false); setConfirmDelete(false); }
+  };
+
+  return (
+    <>
+      <EditField
+        label="Nazwa użytkownika"
+        initial={user?.user_metadata?.username || ''}
+        placeholder="np. Karol"
+        onSave={updateUsername}
+        validate={v => (v.trim().length < 2 ? 'Podaj co najmniej 2 znaki.' : null)}
+      />
+      <EditField
+        label="Adres e-mail"
+        type="email"
+        initial={user?.email || ''}
+        placeholder="ty@example.com"
+        autoComplete="email"
+        hint="Na nowy adres wyślemy link potwierdzający zmianę."
+        onSave={updateEmail}
+        validate={v => (/^\S+@\S+\.\S+$/.test(v.trim()) ? null : 'Nieprawidłowy adres e-mail.')}
+      />
+      <ChangePasswordForm />
+
+      <div className="mt-4 pt-4 border-t border-border flex flex-col gap-2">
+        <button
+          onClick={() => setConfirmLogout(true)}
+          className="w-full flex items-center justify-center gap-2 rounded-xl border border-border text-txt-2 text-sm font-medium py-2.5 hover:bg-surface hover:text-txt transition-colors"
+        >
+          <LogoutIcon size={16} /> Wyloguj się
+        </button>
+        <button
+          onClick={() => { setDeleteError(null); setConfirmDelete(true); }}
+          className="w-full flex items-center justify-center gap-2 rounded-xl border border-danger/40 text-danger text-sm font-medium py-2.5 hover:bg-danger/10 transition-colors"
+        >
+          <TrashIcon size={16} /> Usuń konto
+        </button>
+        <p className="text-txt-3 text-[10px] leading-snug">
+          Usunięcie trwale kasuje konto i wszystkie Twoje dane (wpisy, rozmowy, zdjęcia). Tej operacji nie można cofnąć.
+        </p>
+        {deleteError && <p className="text-danger text-[11px]">{deleteError}</p>}
+      </div>
+
+      <ConfirmModal
+        open={confirmLogout}
+        title="Wylogować się?"
+        message="Czy na pewno chcesz się wylogować?"
+        confirmLabel="Wyloguj"
+        cancelLabel="Anuluj"
+        tone="primary"
+        onCancel={() => setConfirmLogout(false)}
+        onConfirm={() => { setConfirmLogout(false); onSignOut?.(); }}
+      />
+      <ConfirmModal
+        open={confirmDelete}
+        title="Usunąć konto?"
+        message="Czy na pewno chcesz usunąć to konto? Wszystkie Twoje dane zostaną trwale usunięte. Tej operacji nie można cofnąć."
+        confirmLabel="Usuń konto"
+        busy={deleting}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={runDelete}
+      />
+    </>
+  );
+}
+
+// Widok „Wielkość czcionki" — skala interfejsu (zoom), poprawia czytelność na mobile.
+function AppearancePanel() {
+  const [scale, setScale] = useState(getFontScale());
+  const choose = (id) => { setFontScale(id); setScale(id); };
+
+  return (
+    <>
+      <p className="text-txt-3 text-[11px] leading-relaxed mb-3">
+        Zwiększ wielkość tekstu i elementów, jeśli w widoku mobilnym są zbyt drobne. Ustawienie zapamiętujemy na tym urządzeniu.
+      </p>
+      <div className="flex flex-col gap-1.5">
+        {FONT_SCALES.map(s => {
+          const active = scale === s.id;
+          return (
+            <button
+              key={s.id}
+              onClick={() => choose(s.id)}
+              className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                active ? 'border-recovery/50 bg-recovery/10' : 'border-border bg-surface hover:bg-elevated'
+              }`}
+            >
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${
+                active ? 'bg-recovery border-recovery text-bg' : 'border-border-strong text-transparent'
+              }`}>
+                <CheckIcon size={13} />
+              </span>
+              <span className="text-txt font-medium leading-tight" style={{ fontSize: `${13 * s.value}px` }}>{s.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// Nagłówek grupy pozycji menu.
+function GroupLabel({ children }) {
+  return <p className="text-txt-3 text-[10px] font-semibold uppercase tracking-wide px-1 mt-3 mb-1.5 first:mt-0">{children}</p>;
+}
+
+function MenuItem({ label, desc, Icon, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left hover:bg-elevated transition-colors"
+    >
+      <span className="shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-elevated text-txt-2">
+        <Icon size={18} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-txt text-sm font-medium leading-tight">{label}</span>
+        <span className="block text-txt-3 text-[11px] leading-tight truncate">{desc}</span>
+      </span>
+      <span className="shrink-0 text-txt-3"><ChevronRightIcon size={16} /></span>
+    </button>
+  );
+}
+
+// Menu ustawień — pogrupowane logicznie: Konto → Wygląd → Logan → Deweloper.
+function SettingsMenu({ go }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <GroupLabel>Konto</GroupLabel>
+      <MenuItem label="Konto" desc="Nazwa, e-mail, hasło, usunięcie konta" Icon={UserIcon} onClick={() => go('account')} />
+
+      <GroupLabel>Wygląd</GroupLabel>
+      <MenuItem label="Wielkość czcionki" desc="Powiększ tekst dla lepszej czytelności" Icon={TextSizeIcon} onClick={() => go('appearance')} />
+
+      <GroupLabel>Logan</GroupLabel>
+      <MenuItem label="Głos Logana" desc="Wybór lektora odczytu analizy" Icon={SpeakerIcon} onClick={() => go('voice')} />
+      <MenuItem label="Limity zapytań" desc="Dzienne zużycie limitu Logana" Icon={GaugeIcon} onClick={() => go('usage')} />
+
+      <GroupLabel>Deweloper</GroupLabel>
+      <MenuItem label="Tokeny API" desc="Sterowanie aplikacją spoza SomaLog" Icon={KeyIcon} onClick={() => go('tokens')} />
+    </div>
+  );
+}
+
+const TITLES = {
+  menu: 'Panel użytkownika',
+  account: 'Konto',
+  appearance: 'Wielkość czcionki',
+  voice: 'Głos Logana',
+  tokens: 'Tokeny API',
+  usage: 'Limity zapytań',
+};
+
+// Panel użytkownika — menu ustawień z podwidokami.
+export default function SettingsPanel({ open, onClose, initialView = 'menu', user, onSignOut }) {
+  const [view, setView] = useState('menu');
   // Przy otwarciu ustaw widok startowy (np. 'usage' po wyczerpaniu limitu Logana).
   useEffect(() => { if (open) setView(initialView); }, [open, initialView]);
 
-  const inVoice = view === 'voice';
-  const inTokens = view === 'tokens';
-  const inUsage = view === 'usage';
-  const inSub = inVoice || inTokens || inUsage;
-  // Nazwa użytkownika: dla logowania e-mailem — część przed „@".
-  const username = email ? email.split('@')[0] : null;
-  const title = inVoice ? 'Głos Logana' : inTokens ? 'Tokeny API' : inUsage ? 'Limity zapytań' : 'Panel użytkownika';
+  const inSub = view !== 'menu';
+  const username = displayName(user);
+  const title = TITLES[view] ?? 'Panel użytkownika';
 
   return (
     <>
@@ -351,10 +571,12 @@ export default function SettingsPanel({ open, onClose, initialView = 'menu', ema
             </button>
           </div>
 
-          {inVoice ? <VoicePicker />
-            : inTokens ? <TokensPanel />
-            : inUsage ? <UsagePanel />
-            : <SettingsMenu onOpenVoice={() => setView('voice')} onOpenTokens={() => setView('tokens')} onOpenUsage={() => setView('usage')} />}
+          {view === 'account' ? <AccountPanel user={user} onSignOut={onSignOut} />
+            : view === 'appearance' ? <AppearancePanel />
+            : view === 'voice' ? <VoicePicker />
+            : view === 'tokens' ? <TokensPanel />
+            : view === 'usage' ? <UsagePanel />
+            : <SettingsMenu go={setView} />}
         </div>
       </div>
     </>

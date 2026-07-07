@@ -5,6 +5,7 @@ import { useChat } from './hooks/useChat';
 import { summarizeDay } from './lib/agent';
 import { RATE_LIMIT_EVENT } from './lib/usage';
 import { loadVoiceFromServer } from './lib/voice';
+import { initFontScale } from './lib/fontScale';
 import { toDateString, buildLast30Days, buildDayRange } from './utils/dateUtils';
 import AppLayout from './layouts/AppLayout';
 import Header from './components/Header';
@@ -14,8 +15,10 @@ import InputBar from './components/InputBar';
 import ChatPanel from './components/ChatPanel';
 import AddEntryModal from './components/AddEntryModal';
 import SettingsPanel from './components/SettingsPanel';
+import ConfirmModal from './components/ConfirmModal';
 import DateRangePicker from './components/DateRangePicker';
 import Auth from './screens/Auth';
+import ResetPassword from './screens/ResetPassword';
 import Docs from './screens/Docs';
 import { useRoute } from './lib/nav';
 
@@ -30,6 +33,7 @@ export default function App() {
   const [showChat,     setShowChat]      = useState(false);
   const [showSettings, setShowSettings]  = useState(false);
   const [settingsView, setSettingsView]  = useState('menu');
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const [draft,        setDraft]         = useState('');
   // Wybrany okres karuzeli: null = domyślnie ostatni miesiąc; { start, end } = filtr.
   const [range,        setRange]         = useState(null);
@@ -41,13 +45,16 @@ export default function App() {
     [range],
   );
 
-  const { session, loading: authLoading, signIn, signUp, signOut } = useAuth();
+  const { session, loading: authLoading, recovery, clearRecovery, signIn, signUp, signOut, signInWithGoogle } = useAuth();
   const userId = session?.user?.id ?? null;
   const { entries, entriesByDate, saveEntry, updateSummary, deleteEntry } = useEntries(userId);
   const { messages, sending, error: chatError, sendMessage } = useChat(userId, selectedDate);
 
   // Zmiana dnia → czysty composer i zamknięta rozmowa (wątek ładuje się dla nowego dnia).
   useEffect(() => { setDraft(''); setShowChat(false); }, [selectedDate]);
+
+  // Zastosuj zapisaną skalę czcionki (czytelność, zwłaszcza mobile) przy starcie.
+  useEffect(() => { initFontScale(); }, []);
 
   // Po zalogowaniu wczytaj zapisany na koncie głos Logana do lokalnego cache (trwałość między sesjami).
   useEffect(() => { if (userId) loadVoiceFromServer(); }, [userId]);
@@ -70,10 +77,19 @@ export default function App() {
     );
   }
 
+  // Tryb odzyskiwania hasła (wejście z linku z e-maila) — ma priorytet nad zwykłym widokiem.
+  if (recovery) {
+    return (
+      <div className="bg-bg min-h-screen max-w-md mx-auto">
+        <ResetPassword onDone={clearRecovery} />
+      </div>
+    );
+  }
+
   if (!session) {
     return (
       <div className="bg-bg min-h-screen max-w-md mx-auto">
-        <Auth onSignIn={signIn} onSignUp={signUp} />
+        <Auth onSignIn={signIn} onSignUp={signUp} onSignInWithGoogle={signInWithGoogle} />
       </div>
     );
   }
@@ -131,7 +147,7 @@ export default function App() {
       modulesOpen={modulesOpen}
       onToggleModules={() => setModulesOpen(o => !o)}
       header={
-        <Header onSignOut={signOut} onOpenSettings={() => { setSettingsView('menu'); setShowSettings(true); }} />
+        <Header onSignOut={() => setConfirmLogout(true)} onOpenSettings={() => { setSettingsView('menu'); setShowSettings(true); }} />
       }
       dayStrip={
         <DayStrip
@@ -194,7 +210,8 @@ export default function App() {
             open={showSettings}
             onClose={() => setShowSettings(false)}
             initialView={settingsView}
-            email={session?.user?.email}
+            user={session?.user}
+            onSignOut={signOut}
           />
           <DateRangePicker
             open={showRangePicker}
@@ -202,6 +219,16 @@ export default function App() {
             onApply={handleApplyRange}
             initialStart={range?.start}
             initialEnd={range?.end}
+          />
+          <ConfirmModal
+            open={confirmLogout}
+            title="Wylogować się?"
+            message="Czy na pewno chcesz się wylogować?"
+            confirmLabel="Wyloguj"
+            cancelLabel="Anuluj"
+            tone="primary"
+            onCancel={() => setConfirmLogout(false)}
+            onConfirm={() => { setConfirmLogout(false); signOut(); }}
           />
         </>
       }
