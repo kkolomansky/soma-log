@@ -56,7 +56,7 @@ export default function ChatPanel({
 
       {/* Sheet */}
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 flex flex-col bg-bg border-x-2 border-t-2 border-border-strong rounded-t-3xl shadow-2xl shadow-black/50
+        className={`fixed inset-x-0 bottom-0 z-50 flex flex-col bg-bg border-x border-t border-border rounded-t-3xl shadow-2xl shadow-black/40
           h-[80vh] max-w-3xl mx-auto transition-transform duration-300 ${
             open ? 'translate-y-0' : 'translate-y-full'
           }`}

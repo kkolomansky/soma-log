@@ -10,6 +10,7 @@ import { METRICS } from '../utils/metrics';
 import { GaugeIcon, TrendsIcon, NoteIcon, PhotoPlusIcon } from './icons';
 import { uploadPhoto, removePhotos, signedUrls } from '../lib/photos';
 import PhotoFrame from './PhotoFrame';
+import PhotoLightbox from './PhotoLightbox';
 import ConfirmModal from './ConfirmModal';
 
 function CloseIcon({ size = 16 }) {
@@ -41,6 +42,7 @@ function NoteCard({ note, photos, userId, onSave }) {
   const [urls, setUrls] = useState({}); // ścieżka → signed URL
   const [confirmRemovePath, setConfirmRemovePath] = useState(null);
   const [photoError, setPhotoError] = useState(null);
+  const [lightboxIndex, setLightboxIndex] = useState(null); // indeks otwartego zdjęcia w galerii
   const taRef = useRef(null);
   const fileInputRef = useRef(null);
   useEffect(() => { setDraft(note ?? ''); }, [note]);
@@ -124,11 +126,24 @@ function NoteCard({ note, photos, userId, onSave }) {
 
       {localPhotos.length > 0 && (
         <div className="flex flex-col items-center gap-2 mb-3">
-          {localPhotos.map(path => (
-            <PhotoFrame key={path} src={urls[path]} onRemove={() => setConfirmRemovePath(path)} />
+          {localPhotos.map((path, i) => (
+            <PhotoFrame
+              key={path}
+              src={urls[path]}
+              onRemove={() => setConfirmRemovePath(path)}
+              onOpen={urls[path] ? () => setLightboxIndex(i) : undefined}
+            />
           ))}
         </div>
       )}
+
+      <PhotoLightbox
+        open={lightboxIndex !== null}
+        urls={localPhotos.map(p => urls[p]).filter(Boolean)}
+        index={lightboxIndex ?? 0}
+        onIndexChange={setLightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
       {photoError && <p className="text-danger text-xs mb-2">{photoError}</p>}
 
       <textarea
@@ -220,8 +235,11 @@ export default function DayView({ entry, days, selectedDate, entries, userId, on
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  // Przesuwanie palcem w lewo/prawo → zmiana dnia (karuzela podąża za selectedDate).
-  const swipeRef = useRef({ x: 0, y: 0, active: false });
+  // Zmiana dnia gestem: palcem (mobile) oraz przeciągnięciem myszą (desktop) — w dowolnym
+  // miejscu okna dnia (wskaźniki, notatka, podsumowanie Logana), jak na karuzeli.
+  const swipeRef = useRef({ x: 0, y: 0, active: false }); // dotyk
+  const mouseRef = useRef(null);                          // przeciąganie myszą
+  const draggedRef = useRef(false);                       // blokada klik po przeciągnięciu
   const SWIPE_THRESHOLD = 50;
 
   const goRelative = (delta) => {
@@ -232,6 +250,7 @@ export default function DayView({ entry, days, selectedDate, entries, userId, on
     if (next >= 0 && next < days.length) onSelect(days[next]);
   };
 
+  // ── Dotyk (mobile): nie przechwytujemy zdarzeń, by pionowy scroll działał. ──
   const onTouchStart = (e) => {
     const t = e.touches[0];
     swipeRef.current = { x: t.clientX, y: t.clientY, active: true };
@@ -246,13 +265,44 @@ export default function DayView({ entry, days, selectedDate, entries, userId, on
     goRelative(dx < 0 ? 1 : -1); // w lewo → następny dzień, w prawo → poprzedni
   };
 
-  const swipeHandlers = { onTouchStart, onTouchEnd };
+  // ── Mysz (desktop): klik + przeciągnięcie w lewo/prawo zmienia dzień. ──
+  const onPointerDown = (e) => {
+    if (e.pointerType !== 'mouse') return;
+    // Nie przejmuj gestu z pól edycji/suwaków (zaznaczanie tekstu, zmiana wartości).
+    if (e.target.closest?.('input, textarea, [contenteditable="true"]')) return;
+    mouseRef.current = { x: e.clientX, y: e.clientY, dragging: false };
+  };
+  const onPointerMove = (e) => {
+    const m = mouseRef.current;
+    if (!m) return;
+    const dx = e.clientX - m.x;
+    const dy = e.clientY - m.y;
+    if (!m.dragging && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+      m.dragging = true;
+      try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* brak aktywnego wskaźnika */ }
+    }
+  };
+  const onPointerUp = (e) => {
+    const m = mouseRef.current;
+    mouseRef.current = null;
+    if (!m || !m.dragging) return;
+    const dx = e.clientX - m.x;
+    if (Math.abs(dx) >= SWIPE_THRESHOLD) { draggedRef.current = true; goRelative(dx < 0 ? 1 : -1); }
+    try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* nie przechwycono */ }
+  };
+  // Po realnym przeciągnięciu myszą zablokuj kolejny klik (np. w kafelek metryki).
+  const onClickCapture = (e) => {
+    if (draggedRef.current) { draggedRef.current = false; e.stopPropagation(); e.preventDefault(); }
+  };
+
+  const swipeHandlers = { onTouchStart, onTouchEnd, onPointerDown, onPointerMove, onPointerUp, onClickCapture };
 
   // ── Dzień bez wpisu ──
   if (!entry) {
     return (
-      <div className="px-3 py-5 flex flex-col gap-6 max-w-3xl mx-auto w-full" {...swipeHandlers}>
-        <div className="flex flex-col items-center justify-center gap-5 py-10">
+      // min-h-full → gest przewijania dni działa na całej wysokości okna, także gdy dzień jest pusty.
+      <div className="px-3 py-5 flex flex-col gap-6 max-w-3xl mx-auto w-full min-h-full" {...swipeHandlers}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-5 py-10">
           <button
             onClick={() => onAddClick()}
             className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-recovery text-bg text-sm font-semibold hover:opacity-90 active:scale-95 transition-all"
@@ -297,11 +347,12 @@ export default function DayView({ entry, days, selectedDate, entries, userId, on
       <SectionTabs tab={tab} onChange={setTab}>
         {tab === 'wskazniki' ? (
           <>
-            {/* Zegar regeneracji + Podsumowanie Logana. Mobile: zegar kompaktowy + moduł.
-                Web (md+): obie połówki po równo, większy zegar. */}
-            <div className="flex items-stretch gap-3 mb-6">
+            {/* Zegar regeneracji + Podsumowanie Logana. Podział dokładnie 50/50 (bez gap),
+                by lewa krawędź podsumowania Logana leżała w pionie tej samej linii, co
+                pionowa granica między zakładkami Wskaźniki/Trendy. Zegar ~10% mniejszy. */}
+            <div className="flex items-stretch mb-6">
               <div className="flex flex-col items-center justify-center gap-1.5 flex-1 min-w-0">
-                <CircularGauge value={score} max={100} color={label.color} size={isWide ? 156 : 108} strokeWidth={isWide ? 9 : 7} />
+                <CircularGauge value={score} max={100} color={label.color} size={isWide ? 140 : 97} strokeWidth={isWide ? 9 : 7} />
                 <p className="text-sm md:text-base font-display font-bold text-center leading-tight" style={{ color: label.color }}>
                   {label.text}
                 </p>

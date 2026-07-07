@@ -9,6 +9,9 @@ import { supabase } from '../lib/supabase';
 export function useAuth() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Tryb odzyskiwania hasła — po wejściu z linku resetującego (event PASSWORD_RECOVERY)
+  // pokazujemy ekran ustawienia nowego hasła zamiast normalnej aplikacji.
+  const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -16,12 +19,15 @@ export function useAuth() {
       setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true);
     });
 
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  const clearRecovery = useCallback(() => setRecovery(false), []);
 
   const signIn = useCallback(async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -40,5 +46,15 @@ export function useAuth() {
     await supabase.auth.signOut();
   }, []);
 
-  return { session, loading, signIn, signUp, signOut };
+  // Logowanie przez Google (OAuth). Po powrocie z Google Supabase sam ustawi sesję
+  // (detectSessionInUrl = domyślnie true) i odpali onAuthStateChange.
+  const signInWithGoogle = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    return error?.message ?? null;
+  }, []);
+
+  return { session, loading, recovery, clearRecovery, signIn, signUp, signOut, signInWithGoogle };
 }
