@@ -35,6 +35,14 @@ const JSON_SNIPPET = `{
   }
 }`;
 
+// Ręczny test transportu Streamable HTTP. Nagłówek Accept MUSI zawierać oba typy
+// (application/json i text/event-stream) — bez niego transport zwraca 406 Not Acceptable.
+const CURL_SNIPPET = `curl -X POST ${MCP_URL} \\
+  -H "Authorization: Bearer <TWÓJ_TOKEN>" \\
+  -H "Content-Type: application/json" \\
+  -H "Accept: application/json, text/event-stream" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`;
+
 export default function DocsMcp() {
   return (
     <>
@@ -74,6 +82,17 @@ export default function DocsMcp() {
             <div className="mt-2">
               <CodeBlock label="mcp.json" code={JSON_SNIPPET} />
             </div>
+          </div>
+          <div>
+            <SubHeading>Ręczny test (curl)</SubHeading>
+            <div className="mt-2">
+              <CodeBlock label="terminal" code={CURL_SNIPPET} />
+            </div>
+            <p className="mt-2 text-txt-3 text-[13px]">
+              Przy ręcznym teście wyślij nagłówek{' '}
+              <code className="font-mono text-txt">Accept: application/json, text/event-stream</code> — bez niego
+              transport Streamable HTTP zwróci błąd <code className="font-mono text-txt">406 Not Acceptable</code>.
+            </p>
           </div>
           <p className="text-txt-3 text-[13px]">
             Transport: Streamable HTTP (bezstanowy). Token jest przekazywany dalej do API SomaLog, które waliduje go

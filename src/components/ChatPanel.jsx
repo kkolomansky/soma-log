@@ -1,8 +1,37 @@
 import { useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import Composer from './Composer';
 import ThinkingIndicator from './ThinkingIndicator';
 import { LogoMark } from './Logo';
 import { formatFullDate } from '../utils/dateUtils';
+
+// Mapowanie elementów markdown na style dopasowane do bąbla czatu (12px, tokeny designu).
+// Logan odpowiada w markdownie (**pogrubienia**, # nagłówki, listy) — bez tego widać surowe znaki.
+const mdComponents = {
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  strong: ({ children }) => <strong className="font-semibold text-txt">{children}</strong>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+  h1: ({ children }) => <h1 className="font-display font-semibold text-txt text-[13px] mt-2 mb-1 first:mt-0">{children}</h1>,
+  h2: ({ children }) => <h2 className="font-display font-semibold text-txt text-[12.5px] mt-2 mb-1 first:mt-0">{children}</h2>,
+  h3: ({ children }) => <h3 className="font-display font-semibold text-txt text-[12px] mt-1.5 mb-1 first:mt-0">{children}</h3>,
+  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 last:mb-0 space-y-0.5">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 last:mb-0 space-y-0.5">{children}</ol>,
+  li: ({ children }) => <li className="marker:text-txt-3">{children}</li>,
+  a: ({ children, href }) => (
+    <a href={href} target="_blank" rel="noreferrer" className="text-recovery underline break-all">{children}</a>
+  ),
+  code: ({ children }) => (
+    <code className="bg-elevated rounded px-1 py-0.5 text-[11px] font-mono">{children}</code>
+  ),
+  pre: ({ children }) => (
+    <pre className="bg-elevated rounded-lg p-2 my-2 overflow-x-auto text-[11px] [&_code]:bg-transparent [&_code]:p-0">{children}</pre>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-2 border-border pl-2 my-2 text-txt-3">{children}</blockquote>
+  ),
+  hr: () => <hr className="border-divider my-2" />,
+};
 
 function CloseIcon({ size = 18 }) {
   return (
@@ -19,13 +48,15 @@ function Bubble({ role, content }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[12px] leading-relaxed whitespace-pre-wrap break-words md:text-justify ${
+        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[12px] leading-relaxed break-words ${
           isUser
-            ? 'bg-recovery/15 text-txt rounded-br-md'
+            ? 'whitespace-pre-wrap md:text-justify bg-recovery/15 text-txt rounded-br-md'
             : 'bg-surface border border-border text-txt-2 rounded-bl-md'
         }`}
       >
-        {content}
+        {isUser
+          ? content
+          : <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{content}</ReactMarkdown>}
       </div>
     </div>
   );
