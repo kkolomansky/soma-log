@@ -1,4 +1,5 @@
 // Synteza mowy SomaLog — czyta analizę Logana „głosem Jarvisa" (xAI TTS, głos leo).
+import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/logan.ts";
 
 const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
@@ -15,6 +16,18 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return jsonErr("Method not allowed", 405);
   if (!XAI_API_KEY) return jsonErr("Brak konfiguracji XAI_API_KEY", 500);
+
+  // Weryfikacja zalogowanego użytkownika — jak w `transcribe`. Bramka `verify_jwt = true` przepuszcza
+  // publiczny klucz anon, więc endpoint proxujący do płatnego xAI musi sam potwierdzić realną sesję.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader) return jsonErr("Brak autoryzacji", 401);
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return jsonErr("Nieprawidłowa sesja", 401);
 
   let body: { text?: string; voice_id?: string };
   try {
